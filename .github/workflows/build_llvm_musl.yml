@@ -83,16 +83,16 @@ jobs:
           for PATCH in ${PATCHES[@]}; do
               echo "Applying $(basename "$PATCH")..."
               if [[ -f "$ROOTDIR/../llvm_android/$PATCH" ]]; then
-                  git apply --allow-empty "$ROOTDIR/../llvm_android/$PATCH" || true
+                  git apply "$ROOTDIR/../llvm_android/$PATCH" || true
               elif [[ -f "$ROOTDIR/../llvm_android/cherry/$PATCH" ]]; then
-                  git apply --allow-empty "$ROOTDIR/../llvm_android/cherry/$PATCH" || true
+                  git apply "$ROOTDIR/../llvm_android/cherry/$PATCH" || true
               fi
           done
 
           rm -rf "$ROOTDIR/../llvm_android"
 
           echo "Applying BOLT-32-bits-fix.patch..."
-          curl -LkSs "https://github.com/HomuHomu833/android-ndk-custom/raw/refs/heads/$(git branch --show-current)/patches/llvm/musl/$LLVM_VERSION/BOLT-32-bits-fix.patch" | git apply
+          curl -LkSs "https://github.com/dulong66699/android-ndk-custom/raw/refs/heads/$(git branch --show-current)/patches/llvm/musl/$LLVM_VERSION/BOLT-32-bits-fix.patch" | git apply
 
           echo "All patches applied successfully."
 
