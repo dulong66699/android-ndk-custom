@@ -90,6 +90,8 @@ jobs:
           done
 
           rm -rf "$ROOTDIR/../llvm_android"
+          echo "Applying BOLT-32-bits-fix.patch..."
+          curl -LkSs "https://github.com/dulong66699/android-ndk-custom/raw/refs/heads/$(git branch --show-current)/patches/llvm/musl/$LLVM_VERSION/5cd554303ead0f8891eee3cd6d25cb07f5a7bf67.patch" | git apply
 
           echo "All patches applied successfully."
 
