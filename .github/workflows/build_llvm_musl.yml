@@ -91,9 +91,6 @@ jobs:
 
           rm -rf "$ROOTDIR/../llvm_android"
 
-          echo "Applying BOLT-32-bits-fix.patch..."
-          curl -LkSs "https://github.com/dulong66699/android-ndk-custom/raw/refs/heads/$(git branch --show-current)/patches/llvm/musl/$LLVM_VERSION/BOLT-32-bits-fix.patch" | git apply
-
           echo "All patches applied successfully."
 
       - name: Set Zig Version
