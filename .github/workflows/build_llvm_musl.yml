@@ -93,7 +93,7 @@ jobs:
           echo "Applying 5cd554303ead0f8891eee3cd6d25cb07f5a7bf67.patch..."
           curl -LkSs "https://github.com/dulong66699/android-ndk-custom/raw/refs/heads/$(git branch --show-current)/patches/llvm/musl/$LLVM_VERSION/5cd554303ead0f8891eee3cd6d25cb07f5a7bf67.patch" | git apply
           echo "Applying BOLT-32-bits-fix.patch..."
-          curl -LkSs "https://github.com/dulong66699/android-ndk-custom/raw/refs/heads/$(git branch --show-current)/patches/llvm/musl/$LLVM_VERSION/BOLT-fix-32-bits-fix.patch" | git apply
+          curl -LkSs "https://github.com/dulong66699/android-ndk-custom/raw/refs/heads/$(git branch --show-current)/patches/llvm/musl/$LLVM_VERSION/BOLT-fix-32-bits-fix.patch" | git apply --allow-empty
 
           echo "All patches applied successfully."
 
