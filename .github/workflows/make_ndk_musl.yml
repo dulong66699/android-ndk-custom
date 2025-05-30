@@ -33,7 +33,7 @@ jobs:
               echo "version=0.15.0-dev.137+db7db4802" >> $GITHUB_OUTPUT
               ;;
             *)
-              echo "version=0.15.0-dev.300+9e21ba12d" >> $GITHUB_OUTPUT
+              echo "version=0.15.0-dev.137+db7db4802" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -221,7 +221,7 @@ jobs:
       - name: Get NDK and LLVM
         run: |
           curl -LkSs https://dl.google.com/android/repository/android-ndk-r${{inputs.version}}-linux.zip >ndk.zip && unzip -q ndk.zip
-          curl -LkSs https://github.com/HomuHomu833/android-ndk-custom/releases/download/llvm-r${{inputs.version}}/bolt+clang+clang-tools-extra+lld-r${{inputs.version}}-${{matrix.target}}.tar.xz | tar -xJf -
+          curl -LkSs https://github.com/dulong66699/android-ndk-custom/releases/download/llvm-r${{inputs.version}}/bolt+clang+clang-tools-extra+lld-r${{inputs.version}}-${{matrix.target}}.tar.xz | tar -xJf -
 
       - name: Make NDK musl
         run: |
