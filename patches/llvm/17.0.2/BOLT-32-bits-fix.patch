@@ -44,7 +44,7 @@ index 31a636ba2..f1b1be46d 100644
    }
  };
  
-diff --git a/a/bolt/lib/Core/BinaryFunction.cpp b/b/bolt/lib/Core/BinaryFunction.cpp
+diff --git a/bolt/lib/Core/BinaryFunction.cpp b/bolt/lib/Core/BinaryFunction.cpp
 index 5b44a76..fd8d2f5 100644
 --- a/bolt/lib/Core/BinaryFunction.cpp
 +++ b/bolt/lib/Core/BinaryFunction.cpp
