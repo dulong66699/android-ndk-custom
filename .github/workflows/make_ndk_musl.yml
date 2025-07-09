@@ -158,8 +158,8 @@ jobs:
           cmake -S "$HOME/shaderc" -B "$HOME/shaderc/build" -G Ninja \
             -DCMAKE_INSTALL_PREFIX="$HOME/shaderc/install" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_FLAGS="$([[ "${{ matrix.target }}" == "hexagon-linux-musl" ]] && echo '-Wno-bitfield-width -Wno-error=bitfield-width') -O2 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static" \
-            -DCMAKE_CXX_FLAGS="$([[ "${{ matrix.target }}" == "hexagon-linux-musl" ]] && echo '-Wno-bitfield-width -Wno-error=bitfield-width') -O2 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static" \
+            -DCMAKE_C_FLAGS="$([[ "${{ matrix.target }}" == "hexagon-linux-musl" ]] && echo '-Wno-bitfield-width -Wno-error=bitfield-width') -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static" \
+            -DCMAKE_CXX_FLAGS="$([[ "${{ matrix.target }}" == "hexagon-linux-musl" ]] && echo '-Wno-bitfield-width -Wno-error=bitfield-width') -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static" \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,-z,relro,-z,now -static" \
             -DCMAKE_CROSSCOMPILING=True \
             -DCMAKE_SYSTEM_NAME=Linux \
@@ -204,8 +204,8 @@ jobs:
           OBJCOPY=${TOOLCHAIN}/bin/objcopy \
           AR=${TOOLCHAIN}/bin/ar \
           STRIP=${TOOLCHAIN}/bin/strip \
-          CFLAGS="-O2 -g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-error=date-time -Wno-unused-command-line-argument" \
-          CXXFLAGS="-O2 -g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-error=date-time -Wno-unused-command-line-argument" \
+          CFLAGS="-g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-error=date-time -Wno-unused-command-line-argument" \
+          CXXFLAGS="-g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-error=date-time -Wno-unused-command-line-argument" \
           LDFLAGS="-Wl,-z,relro,-z,now -static" \
           ac_cv_func_dlopen=no ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no
           make -j"$(nproc --all)" build_all || echo "WARNING: issue in building python for ${{ matrix.target }}"
