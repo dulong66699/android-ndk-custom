@@ -103,7 +103,7 @@ jobs:
           STRIP=${TOOLCHAIN}/bin/strip \
           CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
           CXXFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
-          LDFLAGS="-Wl,-z,relro,-z,now -static"
+          LDFLAGS="-Wl,-z,relro,-z,now -s -static"
           make -j"$(nproc --all)" install
 
           cd $HOME
@@ -128,7 +128,7 @@ jobs:
           STRIP=${TOOLCHAIN}/bin/strip \
           CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -static -fwrapv -Wno-error=date-time -Wno-unused-command-line-argument" \
           CXXFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -static -fwrapv -Wno-error=date-time -Wno-unused-command-line-argument" \
-          LDFLAGS="-Wl,-z,relro,-z,now -static"
+          LDFLAGS="-Wl,-z,relro,-z,now -s -static"
           make -j"$(nproc --all)" install
 
           # SPIRV-Tools and shaderc
@@ -206,7 +206,7 @@ jobs:
           STRIP=${TOOLCHAIN}/bin/strip \
           CFLAGS="-g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-error=date-time -Wno-unused-command-line-argument" \
           CXXFLAGS="-g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-error=date-time -Wno-unused-command-line-argument" \
-          LDFLAGS="-Wl,-z,relro,-z,now -static" \
+          LDFLAGS="-Wl,-z,relro,-z,now -s -static" \
           ac_cv_func_dlopen=no ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no
           make -j"$(nproc --all)" build_all || echo "WARNING: issue in building python for ${{ matrix.target }}"
           make install
@@ -219,7 +219,7 @@ jobs:
               $HOME/yasm/build/bin/vsyasm \
               $HOME/python/python
           do
-              ${TOOLCHAIN}/bin/strip -R .debug.\* "$file"
+              ${TOOLCHAIN}/bin/strip -p "$file"
           done
 
       - name: Get LLVM
