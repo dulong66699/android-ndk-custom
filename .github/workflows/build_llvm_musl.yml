@@ -129,8 +129,8 @@ jobs:
           TOOLCHAIN=${PWD}/zig-as-llvm
           export CC=${TOOLCHAIN}/bin/cc
           export CXX=${TOOLCHAIN}/bin/c++
-          export CFLAGS="-fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -Wno-unused-command-line-argument"
-          export CXXFLAGS="-fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -Wno-unused-command-line-argument"
+          export CFLAGS="-O3 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -Wno-unused-command-line-argument"
+          export CXXFLAGS="-O3 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -Wno-unused-command-line-argument"
           export LD=${TOOLCHAIN}/bin/ld
           export OBJCOPY=${TOOLCHAIN}/bin/objcopy
           export AR=${TOOLCHAIN}/bin/ar
@@ -165,7 +165,7 @@ jobs:
               (
                   cd "${TARGET_BUILD_DIR}/zstd"
 
-                  $CC -O3 $CFLAGS -c \
+                  $CC $CFLAGS -c \
                       "${ROOTDIR}/zstd/lib/decompress/zstd_ddict.c" \
                       "${ROOTDIR}/zstd/lib/decompress/zstd_decompress.c" \
                       "${ROOTDIR}/zstd/lib/decompress/huf_decompress.c" \
