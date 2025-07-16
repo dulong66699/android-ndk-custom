@@ -211,7 +211,7 @@ jobs:
           cmake -S "$ROOTDIR/llvm" -B "${TARGET_BUILD_DIR}" -G Ninja \
             -DCMAKE_INSTALL_PREFIX="${ROOTDIR}/llvm-${{matrix.target}}" \
             -DCMAKE_PREFIX_PATH="${TARGET_INSTALL_DIR}" \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM;RISCV" \
+            -DLLVM_TARGETS_TO_BUILD="AArch64;ARM;BPF;RISCV;WebAssembly;X86" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CROSSCOMPILING=True \
             -DCMAKE_SYSTEM_NAME=Linux \
