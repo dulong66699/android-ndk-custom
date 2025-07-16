@@ -129,8 +129,8 @@ jobs:
           TOOLCHAIN=${PWD}/zig-as-llvm
           export CC=${TOOLCHAIN}/bin/cc
           export CXX=${TOOLCHAIN}/bin/c++
-          export CFLAGS="-fstack-protector-strong -fsanitize=undefined"
-          export CXXFLAGS="-fstack-protector-strong -fsanitize=undefined"
+          export CFLAGS="-fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -Wno-unused-command-line-argument"
+          export CXXFLAGS="-fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -Wno-unused-command-line-argument"
           export LD=${TOOLCHAIN}/bin/ld
           export OBJCOPY=${TOOLCHAIN}/bin/objcopy
           export AR=${TOOLCHAIN}/bin/ar
@@ -165,7 +165,7 @@ jobs:
               (
                   cd "${TARGET_BUILD_DIR}/zstd"
 
-                  $CC $CFLAGS -c \
+                  $CC -O3 $CFLAGS -c \
                       "${ROOTDIR}/zstd/lib/decompress/zstd_ddict.c" \
                       "${ROOTDIR}/zstd/lib/decompress/zstd_decompress.c" \
                       "${ROOTDIR}/zstd/lib/decompress/huf_decompress.c" \
@@ -212,7 +212,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="${ROOTDIR}/llvm-${{matrix.target}}" \
             -DCMAKE_PREFIX_PATH="${TARGET_INSTALL_DIR}" \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM;RISCV" \
-            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CROSSCOMPILING=True \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DLLVM_DEFAULT_TARGET_TRIPLE=${{matrix.target}} \
@@ -223,9 +223,9 @@ jobs:
             -DCMAKE_OBJCOPY="${TOOLCHAIN}/bin/objcopy" \
             -DCMAKE_AR="${TOOLCHAIN}/bin/ar" \
             -DCMAKE_STRIP="${TOOLCHAIN}/bin/strip" \
-            -DCMAKE_C_FLAGS="-fstack-protector-strong -fsanitize=undefined -static" \
-            -DCMAKE_CXX_FLAGS="-fstack-protector-strong -fsanitize=undefined -static" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static" \
+            -DCMAKE_C_FLAGS="-g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
+            -DCMAKE_CXX_FLAGS="-g0 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,-z,relro,-z,now -s -static" \
             -DLLVM_ENABLE_PROJECTS="${{inputs.projects}}" \
             -DLLVM_ENABLE_ZLIB=FORCE_ON \
             -DLLVM_ENABLE_ZSTD=FORCE_ON \
