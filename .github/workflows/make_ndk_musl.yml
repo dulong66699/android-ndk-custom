@@ -102,8 +102,8 @@ jobs:
           OBJCOPY=${TOOLCHAIN}/bin/objcopy \
           AR=${TOOLCHAIN}/bin/ar \
           STRIP=${TOOLCHAIN}/bin/strip \
-          CFLAGS="-fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
-          CXXFLAGS="-fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
+          CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
+          CXXFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -fsanitize=undefined -static -Wno-unused-command-line-argument" \
           LDFLAGS="-Wl,-z,relro,-z,now -s -static" \
           ac_cv_func_setgid=no \
           ac_cv_func_setresgid=no \
@@ -137,8 +137,8 @@ jobs:
           OBJCOPY=${TOOLCHAIN}/bin/objcopy \
           AR=${TOOLCHAIN}/bin/ar \
           STRIP=${TOOLCHAIN}/bin/strip \
-          CFLAGS="-fstack-clash-protection -fstack-protector-strong -static -fwrapv -Wno-error=date-time -Wno-unused-command-line-argument" \
-          CXXFLAGS="-fstack-clash-protection -fstack-protector-strong -static -fwrapv -Wno-error=date-time -Wno-unused-command-line-argument" \
+          CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -static -fwrapv -Wno-error=date-time -Wno-unused-command-line-argument" \
+          CXXFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong -static -fwrapv -Wno-error=date-time -Wno-unused-command-line-argument" \
           LDFLAGS="-Wl,-z,relro,-z,now -s -static"
           make -j"$(nproc --all)" install
 
