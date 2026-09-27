@@ -320,9 +320,9 @@ build_make() {
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration"
                       LDFLAGS="-static -Wl,--undefined-version"
                        ac_cv_lib_elf_elf_begin=no am_cv_func_iconv=no ac_cv_func_pselect=yes ) ;;
-      linux)   args+=( CFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
-                       CXXFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
-                       LDFLAGS="$CROSS_LDFLAGS" )
+      linux)   args+=( CFLAGS="-O2 -Wno-error=incompatible-pointer-types -g0 $CROSS_CFLAGS"
+                       CXXFLAGS="-O2 -Wno-error=incompatible-pointer-types -g0 $CROSS_CFLAGS"
+                       LDFLAGS="$CROSS_LDFLAGS-s " )
 
         case "$TARGET" in
           *musl*)
@@ -362,7 +362,7 @@ build_yasm() {
       bionic)  args+=( LDFLAGS="-static" ) ;;
       linux)    args+=( CFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
                        CXXFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
-                       LDFLAGS="$CROSS_LDFLAGS" ) ;;
+                       LDFLAGS="$CROSS_LDFLAGS -s" ) ;;
       bsd)     args+=( CFLAGS="-fwrapv $CROSS_CFLAGS" CXXFLAGS="-fwrapv $CROSS_CFLAGS"
                        LDFLAGS="$CROSS_LDFLAGS" ) ;;
       macos)   args+=( CFLAGS="-fwrapv $CROSS_CFLAGS" CXXFLAGS="-fwrapv $CROSS_CFLAGS"
@@ -412,7 +412,7 @@ build_shaderc() {
   local cflags="" exelink=""
   case "$PLATFORM" in
     bionic)  exelink="-static" ;;
-    linux)    exelink="$CROSS_LDFLAGS -s"; cflags="$CROSS_CFLAGS"
+    linux)    exelink="$CROSS_LDFLAGS -s"; cflags="$CROSS_CFLAGS -g0"
              [ "$TARGET" = hexagon-linux-musl ] && cflags="-Wno-bitfield-width -Wno-error=bitfield-width $CROSS_CFLAGS" ;;
     bsd)     cflags="-Wno-error=date-time $CROSS_CFLAGS"; exelink="$CROSS_LDFLAGS" ;;
     macos)   cflags="-Wno-error=date-time $CROSS_CFLAGS"; exelink="$CROSS_LDFLAGS" ;;
