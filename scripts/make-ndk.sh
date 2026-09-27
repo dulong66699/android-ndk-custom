@@ -533,7 +533,7 @@ build_pydeps() {
           ./configure --prefix="$PYDEPS" --build=x86_64-linux-gnu --host="$TARGET" \
             --disable-shared --enable-static --disable-all-programs --enable-libuuid \
             --disable-nls --without-python --without-systemd --without-udev \
-            CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-fstack-clash-protection -fstack-protector-strong $dcf"
+            CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong $dcf"
           make -j"$(ncpu)" install ) \
         || log "libuuid did not build for $TARGET; _uuid will be absent"
       fi ;;
@@ -719,8 +719,8 @@ MODULE_BUILDTYPE=static
                       LD_LIBRARY_PATH="$TC/sysroot/usr/lib/$TARGET"
                       LDFLAGS="-L$PYDEPS/lib -static $ndk_vs"
                       $grpna $pwdna $testna ) ;;
-      linux)   args+=( CFLAGS="-Wno-error=date-time $CROSS_CFLAGS"
-                      CXXFLAGS="-Wno-error=date-time $CROSS_CFLAGS"
+      linux)   args+=( CFLAGS="-Wno-error=date-time -g0 $CROSS_CFLAGS"
+                      CXXFLAGS="-Wno-error=date-time -g0 $CROSS_CFLAGS"
                       LDFLAGS="-L$PYDEPS/lib -s $CROSS_LDFLAGS" ) ;;
       bsd)    # -fPIC: configure omits CCSHARED for the "unknown" platform tag,
               # so the shared stdlib .so fail to link (R_AARCH64_* "recompile
