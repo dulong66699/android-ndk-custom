@@ -360,8 +360,8 @@ build_yasm() {
                  CC="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     case "$PLATFORM" in
       bionic)  args+=( LDFLAGS="-static" ) ;;
-      linux)    args+=( CFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
-                       CXXFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
+      linux)    args+=( CFLAGS="-O2 -fwrapv -Wno-error=date-time $CROSS_CFLAGS"
+                       CXXFLAGS="-O2 -fwrapv -Wno-error=date-time $CROSS_CFLAGS"
                        LDFLAGS="$CROSS_LDFLAGS -s" ) ;;
       bsd)     args+=( CFLAGS="-fwrapv $CROSS_CFLAGS" CXXFLAGS="-fwrapv $CROSS_CFLAGS"
                        LDFLAGS="$CROSS_LDFLAGS" ) ;;
@@ -459,7 +459,7 @@ build_pydeps() {
     ( cd "$BUILD"
       fetch_unpack https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz /tmp/zlib.tar.xz
       cd zlib-1.3.1
-      CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="-fstack-clash-protection -fstack-protector-strong $dcf" \
+      CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="-O3 -fstack-clash-protection -fstack-protector-strong $dcf" \
         ./configure --prefix="$PYDEPS" --static
       make -j"$(ncpu)" install )
   fi
@@ -468,7 +468,7 @@ build_pydeps() {
     ( cd "$BUILD"
       fetch_unpack https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz /tmp/bzip2.tar.gz
       cd bzip2-1.0.8
-      make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="-fstack-clash-protection -fstack-protector-strong $dcf" libbz2.a
+      make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong $dcf" libbz2.a
       cp -f libbz2.a "$PYDEPS/lib/"; cp -f bzlib.h "$PYDEPS/include/" )
   fi
 
@@ -487,7 +487,7 @@ build_pydeps() {
       ./configure --prefix="$PYDEPS" --build=x86_64-linux-gnu --host="$TARGET" \
         --disable-shared --enable-static --disable-xz --disable-xzdec --disable-lzmadec \
         --disable-lzmainfo --disable-lzma-links --disable-scripts --disable-doc --disable-nls \
-        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-fstack-clash-protection -fstack-protector-strong $dcf" \
+        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong $dcf" \
         "${rcargs[@]}"
       make -j"$(ncpu)" install )
   fi
@@ -514,7 +514,7 @@ build_pydeps() {
       cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" .
       ./configure --prefix="$PYDEPS" --build=x86_64-linux-gnu --host="$ffi_host" \
         --disable-shared --enable-static --disable-docs --disable-multi-os-directory \
-        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-fstack-clash-protection -fstack-protector-strong $dcf"
+        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-O2 -fstack-clash-protection -fstack-protector-strong $dcf"
       make -j"$(ncpu)" install
       # libffi installs its headers under lib/libffi-*/include on some layouts.
       for h in "$PYDEPS"/lib/libffi-*/include/*.h; do [ -f "$h" ] && cp -f "$h" "$PYDEPS/include/"; done
