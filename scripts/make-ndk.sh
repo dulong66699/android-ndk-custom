@@ -322,7 +322,7 @@ build_make() {
                        ac_cv_lib_elf_elf_begin=no am_cv_func_iconv=no ac_cv_func_pselect=yes ) ;;
       linux)   args+=( CFLAGS="-O2 -Wno-error=incompatible-pointer-types -g0 $CROSS_CFLAGS"
                        CXXFLAGS="-O2 -Wno-error=incompatible-pointer-types -g0 $CROSS_CFLAGS"
-                       LDFLAGS="$CROSS_LDFLAGS-s " )
+                       LDFLAGS="$CROSS_LDFLAGS -s" )
 
         case "$TARGET" in
           *musl*)
