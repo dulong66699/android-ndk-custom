@@ -12,6 +12,10 @@ on:
         description: "NDK Release revision:"
         required: false
         type: string
+      only:
+        description: "Only these targets (JSON array), default all"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -25,6 +29,7 @@ jobs:
       platform: linux
       version: ${{ inputs.version }}
       revision: ${{ inputs.revision }}
+      only: ${{ inputs.only }}
       # loongarch32-linux-gnu, loongarch32-linux-gnusf
       targets: >-
         ["aarch64-linux-musl", "aarch64-linux-gnu", "aarch64_be-linux-gnu",
