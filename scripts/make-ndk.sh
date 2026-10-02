@@ -821,6 +821,14 @@ assemble_unix() {
   cp "$ROOT/patches/ndk/scripts/clang-tidy.sh" "$NDK_TOOLCHAIN/bin"
   cp "$ROOT/patches/ndk/scripts/ndk-which" "$PREBUILT_BIN"
 
+  # bionic has no /bin/sh or /usr/bin/env; the shell lives at /system/bin/sh
+  if [ "$PLATFORM" = bionic ]; then
+    grep -rlIE '^#! ?(/usr/bin/env sh|/bin/sh)( |$)' "$NDK/build" "$NDK_TOOLCHAIN/bin" "$PREBUILT_BIN" 2>/dev/null \
+      | while IFS= read -r f; do
+          sed -i -E '1s,^#! ?(/usr/bin/env sh|/bin/sh)( |$),#!/system/bin/sh\2,' "$f"
+        done
+  fi
+
   fixup_host_arch
   [ "$PLATFORM" = bsd ] && fixup_bsd_host_os
   [ "$PLATFORM" = macos ] && fixup_macos_host_os
