@@ -572,6 +572,9 @@ build_python() {
     if [ "$PLATFORM" = bionic ]; then
       cp "$ROOT/patches/bionic/sem_clockwait.h" Python/sem_clockwait.h
       sed -i '1i #include "sem_clockwait.h"' Python/thread_pthread.h
+      # getrandom: bionic declares it only from API 28, but configure finds it in
+      # libc.a and sets HAVE_GETRANDOM. Below 28, take the raw syscall path.
+      sed -i 's|^#include "pycore_fileutils.h".*|&\n#if __ANDROID_API__ < 28\n#undef HAVE_GETRANDOM\n#define HAVE_GETRANDOM_SYSCALL 1\n#endif|' Python/bootstrap_hash.c
       # close_range: bionic ships it from API 34, but configure enables
       # HAVE_CLOSE_RANGE, so its callers (fileutils.c, _posixsubprocess.c) fail to
       # compile below 34. Inject a syscall-backed impl right after each caller's
