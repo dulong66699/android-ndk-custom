@@ -12,6 +12,10 @@ on:
         description: "NDK Release revision:"
         required: false
         type: string
+      only:
+        description: "Only these targets (JSON array), default all"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -25,6 +29,7 @@ jobs:
       platform: bsd
       version: ${{ inputs.version }}
       revision: ${{ inputs.revision }}
+      only: ${{ inputs.only }}
       # powerpc-netbsd-eabi, powerpc-freebsd-eabihf
       targets: >-
         ["aarch64-freebsd-none", "aarch64-netbsd-none", "aarch64-openbsd-none",
