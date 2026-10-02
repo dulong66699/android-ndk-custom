@@ -575,6 +575,12 @@ build_python() {
       # getrandom: bionic declares it only from API 28, but configure finds it in
       # libc.a and sets HAVE_GETRANDOM. Below 28, take the raw syscall path.
       sed -i 's|^#include "pycore_fileutils.h".*|&\n#if __ANDROID_API__ < 28\n#undef HAVE_GETRANDOM\n#define HAVE_GETRANDOM_SYSCALL 1\n#endif|' Python/bootstrap_hash.c
+      # expat has the same split. r26+ headers still declare getrandom below 28
+      # (availability attributes), r25's #if-guard it away and expat fails to
+      # compile, so send it down its syscall path too.
+      sed -i '0,/^#.*include.*expat_config\.h.*/s||&\n#if __ANDROID_API__ < 28\n#undef HAVE_GETRANDOM\n#define HAVE_SYSCALL_GETRANDOM 1\n#endif|' Modules/expat/xmlparse.c
+      grep -q 'define HAVE_SYSCALL_GETRANDOM 1' Modules/expat/xmlparse.c \
+        || { echo "expat: expat_config.h include not found in xmlparse.c" >&2; exit 1; }
       # close_range: bionic ships it from API 34, but configure enables
       # HAVE_CLOSE_RANGE, so its callers (fileutils.c, _posixsubprocess.c) fail to
       # compile below 34. Inject a syscall-backed impl right after each caller's
