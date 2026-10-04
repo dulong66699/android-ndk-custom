@@ -311,14 +311,17 @@ build_make() {
       done
       rm -rf .git
     fi
+    # bionic has getloadavg only from API 29; job.c reads /proc/loadavg first,
+    # so below that just report it as unsupported.
+    if [ "$PLATFORM" = bionic ] && [ "$API" -lt 29 ]; then
+      sed -i 's/getloadavg (&load, 1)/-1/' src/job.c
+    fi
     cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" build-aux/
     local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET"
                  CC="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     case "$PLATFORM" in
       # --disable-load: static bionic libdl lacks dlerror/dlclose on older NDKs.
-      # getloadavg: bionic only has it from API 29; use make's fallback.
       bionic)  args+=( --disable-posix-spawn --disable-load
-                       ac_cv_func_getloadavg=no ac_cv_have_decl_getloadavg=no
                        CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration"
                       LDFLAGS="-static -Wl,--undefined-version"
