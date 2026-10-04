@@ -315,7 +315,10 @@ build_make() {
     local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET"
                  CC="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     case "$PLATFORM" in
-      bionic)  args+=( --disable-posix-spawn
+      # --disable-load: static bionic libdl lacks dlerror/dlclose on older NDKs.
+      # getloadavg: bionic only has it from API 29; use make's fallback.
+      bionic)  args+=( --disable-posix-spawn --disable-load
+                       ac_cv_func_getloadavg=no ac_cv_have_decl_getloadavg=no
                        CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration"
                       LDFLAGS="-static -Wl,--undefined-version"
