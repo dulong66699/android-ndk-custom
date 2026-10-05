@@ -19,7 +19,8 @@
 #define L_ctermid 1024
 #endif
 
-static inline char *ctermid(char *buf) {
+#define ctermid ndk_ctermid
+static inline char *ndk_ctermid(char *buf) {
     static char ndk_ctermid_buf[L_ctermid];
     if (buf == NULL)
         buf = ndk_ctermid_buf;

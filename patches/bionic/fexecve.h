@@ -39,7 +39,8 @@
 #endif
 #endif
 
-static inline int fexecve(int fd, char *const argv[], char *const envp[]) {
+#define fexecve ndk_fexecve
+static inline int ndk_fexecve(int fd, char *const argv[], char *const envp[]) {
     int ret = (int)syscall(__NR_execveat, fd, "", argv, envp, AT_EMPTY_PATH);
     if (ret < 0) {
         /* execveat(AT_EMPTY_PATH) on a directory fd or a file opened with

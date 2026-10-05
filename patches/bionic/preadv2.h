@@ -18,7 +18,8 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-static inline ssize_t preadv2(int fd, const struct iovec *iov, int iovcnt,
+#define preadv2 ndk_preadv2
+static inline ssize_t ndk_preadv2(int fd, const struct iovec *iov, int iovcnt,
                               off_t offset, int flags) {
     if (flags == 0 && offset == -1)
         return readv(fd, iov, iovcnt);
@@ -28,7 +29,8 @@ static inline ssize_t preadv2(int fd, const struct iovec *iov, int iovcnt,
     return -1;
 }
 
-static inline ssize_t pwritev2(int fd, const struct iovec *iov, int iovcnt,
+#define pwritev2 ndk_pwritev2
+static inline ssize_t ndk_pwritev2(int fd, const struct iovec *iov, int iovcnt,
                                off_t offset, int flags) {
     if (flags == 0 && offset == -1)
         return writev(fd, iov, iovcnt);

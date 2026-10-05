@@ -26,7 +26,8 @@
 #define __NR_close_range 436 /* Linux 5.9+, arch-independent */
 #endif
 
-static inline int close_range(unsigned int first, unsigned int last, int flags) {
+#define close_range ndk_close_range
+static inline int ndk_close_range(unsigned int first, unsigned int last, int flags) {
 	return (int)syscall(__NR_close_range, first, last, flags);
 }
 
