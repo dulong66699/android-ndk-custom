@@ -48,7 +48,10 @@ static inline int ndk_sem_dec(atomic_uint *count_ptr) {
 	return ndk_semcount_to_value(old);
 }
 
-static inline int sem_clockwait(sem_t *sem, clockid_t clock,
+/* Some NDKs (e.g. r28 betas) declare sem_clockwait as unavailable below
+ * API 30 instead of hiding it, so use our own name and redirect callers. */
+#define sem_clockwait ndk_sem_clockwait
+static inline int ndk_sem_clockwait(sem_t *sem, clockid_t clock,
                                 const struct timespec *abs_timeout) {
 	if (clock != CLOCK_MONOTONIC && clock != CLOCK_REALTIME) {
 		errno = EINVAL;

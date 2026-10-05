@@ -716,7 +716,10 @@ MODULE_BUILDTYPE=static
     # configure overwrites it from the (disabled) pkg-config. setup.py falls
     # back to searching inc_dirs/lib_dirs, which it builds from the Makefile's
     # CPPFLAGS -I and LDFLAGS -L. The -L is already there; supply the -I.
-    args+=( CPPFLAGS="-I$PYDEPS/include" )
+    # bionic: some NDK kernel headers (r28-beta2 asm/swab.h) use plain asm(),
+    # which is not a keyword under CPython's -std=c11.
+    local py_cpp="-I$PYDEPS/include"; [ "$PLATFORM" = bionic ] && py_cpp="$py_cpp -Dasm=__asm__"
+    args+=( CPPFLAGS="$py_cpp" )
     case "$PLATFORM" in
       bionic) # grp/pwd n/a below API 26.
               local grpna=""; [ "$API" -lt 26 ] && grpna="py_cv_module_grp=n/a"
