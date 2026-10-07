@@ -311,11 +311,17 @@ build_make() {
       done
       rm -rf .git
     fi
+    # bionic has getloadavg only from API 29; job.c reads /proc/loadavg first,
+    # so below that just report it as unsupported.
+    if [ "$PLATFORM" = bionic ] && [ "$API" -lt 29 ]; then
+      sed -i 's/getloadavg (&load, 1)/-1/' src/job.c
+    fi
     cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" build-aux/
     local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET"
                  CC="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     case "$PLATFORM" in
-      bionic)  args+=( --disable-posix-spawn
+      # --disable-load: static bionic libdl lacks dlerror/dlclose on older NDKs.
+      bionic)  args+=( --disable-posix-spawn --disable-load
                        CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration"
                       LDFLAGS="-static -Wl,--undefined-version"
@@ -710,7 +716,10 @@ MODULE_BUILDTYPE=static
     # configure overwrites it from the (disabled) pkg-config. setup.py falls
     # back to searching inc_dirs/lib_dirs, which it builds from the Makefile's
     # CPPFLAGS -I and LDFLAGS -L. The -L is already there; supply the -I.
-    args+=( CPPFLAGS="-I$PYDEPS/include" )
+    # bionic: some NDK kernel headers (r28-beta2 asm/swab.h) use plain asm(),
+    # which is not a keyword under CPython's -std=c11.
+    local py_cpp="-I$PYDEPS/include"; [ "$PLATFORM" = bionic ] && py_cpp="$py_cpp -Dasm=__asm__"
+    args+=( CPPFLAGS="$py_cpp" )
     case "$PLATFORM" in
       bionic) # grp/pwd n/a below API 26.
               local grpna=""; [ "$API" -lt 26 ] && grpna="py_cv_module_grp=n/a"

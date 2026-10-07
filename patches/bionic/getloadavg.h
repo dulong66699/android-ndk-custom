@@ -15,7 +15,8 @@
 #include <errno.h>
 #include <stdlib.h>
 
-static inline int getloadavg(double loadavg[], int nelem) {
+#define getloadavg ndk_getloadavg
+static inline int ndk_getloadavg(double loadavg[], int nelem) {
     (void)loadavg;
     (void)nelem;
     errno = ENOSYS;

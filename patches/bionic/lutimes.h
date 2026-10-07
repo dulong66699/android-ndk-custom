@@ -17,7 +17,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
-static inline int lutimes(const char *path, const struct timeval tv[2]) {
+#define lutimes ndk_lutimes
+static inline int ndk_lutimes(const char *path, const struct timeval tv[2]) {
     struct timespec ts[2];
     if (tv != NULL) {
         ts[0].tv_sec  = tv[0].tv_sec;

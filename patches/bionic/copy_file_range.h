@@ -34,7 +34,8 @@
 #endif
 #endif
 
-static inline ssize_t copy_file_range(int fd_in, off64_t *off_in,
+#define copy_file_range ndk_copy_file_range
+static inline ssize_t ndk_copy_file_range(int fd_in, off64_t *off_in,
                                        int fd_out, off64_t *off_out,
                                        size_t len, unsigned int flags) {
     return (ssize_t)syscall(__NR_copy_file_range, fd_in, off_in,

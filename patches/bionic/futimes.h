@@ -17,7 +17,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
-static inline int futimes(int fd, const struct timeval tv[2]) {
+#define futimes ndk_futimes
+static inline int ndk_futimes(int fd, const struct timeval tv[2]) {
     struct timespec ts[2];
     if (tv != NULL) {
         ts[0].tv_sec  = tv[0].tv_sec;

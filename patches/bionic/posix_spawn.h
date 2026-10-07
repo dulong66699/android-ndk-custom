@@ -93,7 +93,8 @@ struct __posix_spawn_file_actions {
 /* posix_spawnattr_t is an opaque pointer (struct __posix_spawnattr *).
  * These functions receive posix_spawnattr_t *, so *attr is the handle. */
 
-static inline int posix_spawnattr_init(posix_spawnattr_t *attr) {
+#define posix_spawnattr_init ndk_posix_spawnattr_init
+static inline int ndk_posix_spawnattr_init(posix_spawnattr_t *attr) {
     if (attr == NULL) { errno = EINVAL; return -1; }
     *attr = (struct __posix_spawnattr *)calloc(1, sizeof(struct __posix_spawnattr));
     if (*attr == NULL) { errno = ENOMEM; return -1; }
@@ -101,7 +102,8 @@ static inline int posix_spawnattr_init(posix_spawnattr_t *attr) {
     return 0;
 }
 
-static inline int posix_spawnattr_destroy(posix_spawnattr_t *attr) {
+#define posix_spawnattr_destroy ndk_posix_spawnattr_destroy
+static inline int ndk_posix_spawnattr_destroy(posix_spawnattr_t *attr) {
     if (attr != NULL && *attr != NULL) {
         free(*attr);
         *attr = NULL;
@@ -109,40 +111,46 @@ static inline int posix_spawnattr_destroy(posix_spawnattr_t *attr) {
     return 0;
 }
 
-static inline int posix_spawnattr_setflags(posix_spawnattr_t *attr, short flags) {
+#define posix_spawnattr_setflags ndk_posix_spawnattr_setflags
+static inline int ndk_posix_spawnattr_setflags(posix_spawnattr_t *attr, short flags) {
     if (attr == NULL || *attr == NULL) { errno = EINVAL; return -1; }
     (*attr)->flags = flags;
     return 0;
 }
 
-static inline int posix_spawnattr_setpgroup(posix_spawnattr_t *attr, pid_t pgroup) {
+#define posix_spawnattr_setpgroup ndk_posix_spawnattr_setpgroup
+static inline int ndk_posix_spawnattr_setpgroup(posix_spawnattr_t *attr, pid_t pgroup) {
     if (attr == NULL || *attr == NULL) { errno = EINVAL; return -1; }
     (*attr)->pgroup = pgroup;
     return 0;
 }
 
-static inline int posix_spawnattr_setsigmask(posix_spawnattr_t *attr,
+#define posix_spawnattr_setsigmask ndk_posix_spawnattr_setsigmask
+static inline int ndk_posix_spawnattr_setsigmask(posix_spawnattr_t *attr,
                                              const sigset_t *sigmask) {
     if (attr == NULL || *attr == NULL || sigmask == NULL) { errno = EINVAL; return -1; }
     (*attr)->sigmask = *sigmask;
     return 0;
 }
 
-static inline int posix_spawnattr_setsigdefault(posix_spawnattr_t *attr,
+#define posix_spawnattr_setsigdefault ndk_posix_spawnattr_setsigdefault
+static inline int ndk_posix_spawnattr_setsigdefault(posix_spawnattr_t *attr,
                                                 const sigset_t *sigdefault) {
     if (attr == NULL || *attr == NULL || sigdefault == NULL) { errno = EINVAL; return -1; }
     (*attr)->sigdefault = *sigdefault;
     return 0;
 }
 
-static inline int posix_spawnattr_setschedparam(posix_spawnattr_t *attr,
+#define posix_spawnattr_setschedparam ndk_posix_spawnattr_setschedparam
+static inline int ndk_posix_spawnattr_setschedparam(posix_spawnattr_t *attr,
                                                 const struct sched_param *schedparam) {
     if (attr == NULL || *attr == NULL || schedparam == NULL) { errno = EINVAL; return -1; }
     (*attr)->schedparam = *schedparam;
     return 0;
 }
 
-static inline int posix_spawnattr_setschedpolicy(posix_spawnattr_t *attr, int policy) {
+#define posix_spawnattr_setschedpolicy ndk_posix_spawnattr_setschedpolicy
+static inline int ndk_posix_spawnattr_setschedpolicy(posix_spawnattr_t *attr, int policy) {
     if (attr == NULL || *attr == NULL) { errno = EINVAL; return -1; }
     (*attr)->schedpolicy = policy;
     return 0;
@@ -167,14 +175,16 @@ static inline char *__ndk_strdup(const char *s) {
 
 /* posix_spawn_file_actions_t is an opaque pointer too. */
 
-static inline int posix_spawn_file_actions_init(posix_spawn_file_actions_t *fa) {
+#define posix_spawn_file_actions_init ndk_posix_spawn_file_actions_init
+static inline int ndk_posix_spawn_file_actions_init(posix_spawn_file_actions_t *fa) {
     if (fa == NULL) { errno = EINVAL; return -1; }
     *fa = (struct __posix_spawn_file_actions *)calloc(1, sizeof(struct __posix_spawn_file_actions));
     if (*fa == NULL) { errno = ENOMEM; return -1; }
     return 0;
 }
 
-static inline int posix_spawn_file_actions_destroy(posix_spawn_file_actions_t *fa) {
+#define posix_spawn_file_actions_destroy ndk_posix_spawn_file_actions_destroy
+static inline int ndk_posix_spawn_file_actions_destroy(posix_spawn_file_actions_t *fa) {
     if (fa == NULL || *fa == NULL) { errno = EINVAL; return -1; }
     __ndk_fa_node *cur = (*fa)->head;
     while (cur != NULL) {
@@ -188,7 +198,8 @@ static inline int posix_spawn_file_actions_destroy(posix_spawn_file_actions_t *f
     return 0;
 }
 
-static inline int posix_spawn_file_actions_addopen(
+#define posix_spawn_file_actions_addopen ndk_posix_spawn_file_actions_addopen
+static inline int ndk_posix_spawn_file_actions_addopen(
     posix_spawn_file_actions_t *fa, int fd, const char *path,
     int oflag, mode_t mode) {
     if (fa == NULL || *fa == NULL || path == NULL || fd < 0) { errno = EINVAL; return -1; }
@@ -211,7 +222,8 @@ static inline int posix_spawn_file_actions_addopen(
     return 0;
 }
 
-static inline int posix_spawn_file_actions_addclose(
+#define posix_spawn_file_actions_addclose ndk_posix_spawn_file_actions_addclose
+static inline int ndk_posix_spawn_file_actions_addclose(
     posix_spawn_file_actions_t *fa, int fd) {
     if (fa == NULL || *fa == NULL || fd < 0) { errno = EINVAL; return -1; }
     __ndk_fa_node *node = (__ndk_fa_node *)malloc(sizeof(__ndk_fa_node));
@@ -230,7 +242,8 @@ static inline int posix_spawn_file_actions_addclose(
     return 0;
 }
 
-static inline int posix_spawn_file_actions_adddup2(
+#define posix_spawn_file_actions_adddup2 ndk_posix_spawn_file_actions_adddup2
+static inline int ndk_posix_spawn_file_actions_adddup2(
     posix_spawn_file_actions_t *fa, int fd, int newfd) {
     if (fa == NULL || *fa == NULL || fd < 0 || newfd < 0) { errno = EINVAL; return -1; }
     __ndk_fa_node *node = (__ndk_fa_node *)malloc(sizeof(__ndk_fa_node));
@@ -317,7 +330,8 @@ static inline void __ndk_spawn_child(const char *path,
 /*  posix_spawn / posix_spawnp                                         */
 /* ------------------------------------------------------------------ */
 
-static inline int posix_spawn(pid_t *pid, const char *path,
+#define posix_spawn ndk_posix_spawn
+static inline int ndk_posix_spawn(pid_t *pid, const char *path,
     const posix_spawn_file_actions_t *file_actions,
     const posix_spawnattr_t *attrp,
     char *const argv[], char *const envp[]) {
@@ -336,7 +350,8 @@ static inline int posix_spawn(pid_t *pid, const char *path,
     return 0;
 }
 
-static inline int posix_spawnp(pid_t *pid, const char *file,
+#define posix_spawnp ndk_posix_spawnp
+static inline int ndk_posix_spawnp(pid_t *pid, const char *file,
     const posix_spawn_file_actions_t *file_actions,
     const posix_spawnattr_t *attrp,
     char *const argv[], char *const envp[]) {
