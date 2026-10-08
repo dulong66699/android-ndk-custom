@@ -1217,6 +1217,10 @@ HOST_ARCH=x86_64' "$NDK/build/tools/ndk_bin_common.sh"
 archive() {
   local parent base out
   parent="$(dirname "$NDK")"; base="$(basename "$NDK")"
+  # Ad-hoc (re)sign what strip broke; Apple Silicon kills unsigned binaries.
+  if [ "$PLATFORM" = macos ]; then
+    "$(dirname -- "$0")/macos-sign.sh" "$NDK"
+  fi
   if [ "$PLATFORM" = windows ]; then
     out="$ROOTDIR/${NDK_NAME}-${TARGET}.7z"
     ( cd "$parent" && 7z a -snl -t7z -mx=9 -m0=LZMA2 -md=256m -mfb=273 -mtc=on -mmt=on "$out" "$base" )
