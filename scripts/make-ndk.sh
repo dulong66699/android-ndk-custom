@@ -814,9 +814,19 @@ MODULE_BUILDTYPE=static
     make -j"$(ncpu)" build_all 2>&1 | tee build_all.log
     [ "${PIPESTATUS[0]}" = 0 ] || exit 1
     # setup.py only warns when stdlib extensions fail to build; a python3
-    # without _struct/zlib/... breaks ndk-stack and every script, so fail here.
-    if grep -A20 '^Failed to build these modules:' build_all.log; then
-      echo "python: stdlib extension modules failed to build" >&2; exit 1
+    # without _struct/zlib/... breaks ndk-stack and every script, so fail here
+    # when one of those is missing. Linux only: _ctypes is expected to fail
+    # there (no libffi for most targets), and bsd already lacks more (zlib,
+    # _bz2, _lzma on some targets).
+    if [ "$PLATFORM" = linux ]; then
+      local failed
+      failed="$(awk '/^Failed to build these modules:/{f=1;next} f&&!NF{f=0} f' build_all.log)"
+      for m in _struct zlib binascii _posixsubprocess select math _json _bz2 _lzma; do
+        if printf '%s\n' $failed | grep -qx "$m"; then
+          echo "python: required stdlib module $m failed to build:" >&2
+          echo "$failed" >&2; exit 1
+        fi
+      done
     fi
     make install
   )
