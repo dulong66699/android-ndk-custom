@@ -220,6 +220,12 @@ setup_toolchain() {
       mkdir -p "$BUILD"
       "$CROSS_CC" -O2 -fPIC -c "$ROOT/patches/bionic/wipeonfork_compat.c" -o "$BUILD/bionic_wipeonfork_compat.o"
       BIONIC_EXE_LDFLAGS="$BUILD/bionic_wipeonfork_compat.o -Wl,--wrap=madvise"
+      # arm/arm64 executables need an 8-word-aligned PT_TLS to clear bionic's TCB
+      # slots, or startup aborts with "executable's TLS segment is underaligned".
+      # crtbegin only supplies that from API 29 (older official NDKs, e.g. r25,
+      # left it at 8 bytes), so link our own copy in. No-op elsewhere.
+      "$CROSS_CC" -c "$ROOT/patches/bionic/tls_align.S" -o "$BUILD/bionic_tls_align.o"
+      BIONIC_EXE_LDFLAGS="$BIONIC_EXE_LDFLAGS $BUILD/bionic_tls_align.o"
       ;;
     linux)
       TC=/opt/zig-as-llvm; export ZIG_TARGET="$TARGET"
