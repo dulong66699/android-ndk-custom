@@ -680,12 +680,17 @@ MODULE_BUILDTYPE=static
 ' configure
       sed -i 's#^\([[:space:]]*\)MODULES_SETUP_STDLIB=$#\1MODULES_SETUP_STDLIB=Modules/Setup.stdlib#' configure
     fi
-    # linux/bsd (zig): neuter setup.py's add_cross_compiling_paths(). Its
-    # `$(CC) -E -v` probe leaks the host's /usr/include into the cross build,
-    # breaking every extension. zig resolves its own sysroot internally, so drop
-    # the probe. macos/mingw report correct sysroots and keep it.
+    # linux/bsd (zig): neuter setup.py's add_cross_compiling_paths() and
+    # add_multiarch_paths(). Their `$(CC) -E -v` / `$(CC) -print-multiarch`
+    # probes leak the host's /usr/include (and /usr/include/<multiarch>) into
+    # the cross build, breaking every extension. The multiarch one only bites
+    # when the target's multiarch dir exists on the runner, i.e. x86_64-linux-gnu.
+    # zig resolves its own sysroot internally, so drop both. macos/mingw report
+    # correct sysroots and keep them.
     case "$PLATFORM" in
-      linux|bsd) sed -i 's/^\( *\)def add_cross_compiling_paths(self):/\1def add_cross_compiling_paths(self):\n\1    return  # NDK: zig embeds its sysroot; host \/usr\/include must not leak in/' setup.py ;;
+      linux|bsd) sed -i 's/^\( *\)def \(add_cross_compiling_paths\|add_multiarch_paths\)(self):/\1def \2(self):\n\1    return  # NDK: zig embeds its sysroot; host \/usr\/include must not leak in/' setup.py
+                 [ "$(grep -c 'host /usr/include must not leak in' setup.py)" = 2 ] \
+                   || { echo "setup.py: path probes not neutered" >&2; exit 1; } ;;
     esac
 
     # PKG_CONFIG=/bin/false: host pkg-config reports x86_64-linux libs and would
@@ -775,7 +780,13 @@ MODULE_BUILDTYPE=static
     # the import lib, so under -j it races. Build the DLL (and its import lib)
     # first.
     [ "$PLATFORM" = windows ] && make -j"$(ncpu)" libpython3.11.dll
-    make -j"$(ncpu)" build_all
+    make -j"$(ncpu)" build_all 2>&1 | tee build_all.log
+    [ "${PIPESTATUS[0]}" = 0 ] || exit 1
+    # setup.py only warns when stdlib extensions fail to build; a python3
+    # without _struct/zlib/... breaks ndk-stack and every script, so fail here.
+    if grep -A20 '^Failed to build these modules:' build_all.log; then
+      echo "python: stdlib extension modules failed to build" >&2; exit 1
+    fi
     make install
   )
 }
