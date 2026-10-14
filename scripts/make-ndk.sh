@@ -204,6 +204,7 @@ download_official_ndk() {
 # --- toolchain selection (mirrors build.sh's case "$PLATFORM") -------------
 setup_toolchain() {
   CROSS_CFLAGS="-fno-sanitize=undefined"; CROSS_LDFLAGS=""; SYSTEM_NAME=Linux
+  BIONIC_EXE_LDFLAGS=""
   case "$PLATFORM" in
     bionic)
       API="${ANDROID_PLATFORM:-24}"; [ "$TARGET" = riscv64-linux-android ] && API=35
@@ -213,6 +214,12 @@ setup_toolchain() {
       CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
       NDK_HOST=linux-x86_64
       CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384"
+      # Pre-4.14 kernels reject MADV_WIPEONFORK with EINVAL, and newer bionic's
+      # arc4random aborts on that ("arc4random data MADV_WIPEONFORK failed").
+      # Wrap madvise in every static executable to emulate it (see the .c).
+      mkdir -p "$BUILD"
+      "$CROSS_CC" -O2 -fPIC -c "$ROOT/patches/bionic/wipeonfork_compat.c" -o "$BUILD/bionic_wipeonfork_compat.o"
+      BIONIC_EXE_LDFLAGS="$BUILD/bionic_wipeonfork_compat.o -Wl,--wrap=madvise"
       ;;
     linux)
       TC=/opt/zig-as-llvm; export ZIG_TARGET="$TARGET"
@@ -337,7 +344,7 @@ build_make() {
       bionic)  args+=( --disable-posix-spawn --disable-load
                        CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration"
-                      LDFLAGS="-static -Wl,--undefined-version"
+                      LDFLAGS="-static -Wl,--undefined-version $BIONIC_EXE_LDFLAGS"
                        ac_cv_lib_elf_elf_begin=no am_cv_func_iconv=no ac_cv_func_pselect=yes ) ;;
       linux)   args+=( CFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
                        CXXFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
@@ -378,7 +385,7 @@ build_yasm() {
     local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET" --disable-nls
                  CC="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     case "$PLATFORM" in
-      bionic)  args+=( LDFLAGS="-static" ) ;;
+      bionic)  args+=( LDFLAGS="-static $BIONIC_EXE_LDFLAGS" ) ;;
       linux)    args+=( CFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
                        CXXFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
                        LDFLAGS="$CROSS_LDFLAGS" ) ;;
@@ -448,7 +455,7 @@ build_shaderc() {
 
   local cflags="" exelink=""
   case "$PLATFORM" in
-    bionic)  exelink="-static" ;;
+    bionic)  exelink="-static $BIONIC_EXE_LDFLAGS" ;;
     linux)    exelink="$CROSS_LDFLAGS"; cflags="$CROSS_CFLAGS"
              [ "$TARGET" = hexagon-linux-musl ] && cflags="-Wno-bitfield-width -Wno-error=bitfield-width $CROSS_CFLAGS" ;;
     bsd)     cflags="-Wno-error=date-time $CROSS_CFLAGS"; exelink="$CROSS_LDFLAGS" ;;
@@ -771,7 +778,7 @@ MODULE_BUILDTYPE=static
               esac
               args+=( TOOLCHAIN="$TC" API="$API"
                       LD_LIBRARY_PATH="$TC/sysroot/usr/lib/$TARGET"
-                      LDFLAGS="-L$PYDEPS/lib -static $ndk_vs"
+                      LDFLAGS="-L$PYDEPS/lib -static $ndk_vs $BIONIC_EXE_LDFLAGS"
                       $grpna $pwdna $testna ) ;;
       linux)   args+=( CFLAGS="-Wno-error=date-time $CROSS_CFLAGS"
                       CXXFLAGS="-Wno-error=date-time $CROSS_CFLAGS"
