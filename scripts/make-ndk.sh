@@ -414,6 +414,24 @@ build_shaderc() {
   fi
   ( cd "$SH/third_party/spirv-tools" && git init --quiet && git apply "$ROOT/patches/ndk/spirv/full_static.patch" && rm -rf .git )
   ( cd "$SH" && git init --quiet && git apply "$ROOT/patches/ndk/shaderc/full_static.patch" && rm -rf .git )
+  # big-endian hosts: glslc writes the SPIR-V words in host byte order, but
+  # .spv files are little-endian (Android/Vulkan load them as LE words, and
+  # official glslc only runs on LE hosts). Byte-swap binary output there.
+  local fc="$SH/glslc/src/file_compiler.cc"
+  sed -i 's|^        out->write(compilation_output.data(), compilation_output.size());$|#if defined(__BYTE_ORDER__) \&\& __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__\
+        if (std::is_same<CompilationResultType, shaderc::SpvCompilationResult>::value \&\&\
+            potential_dependency_info_output.empty()) {\
+          std::string le(compilation_output.data(), compilation_output.size());\
+          for (size_t i = 0; i + 3 < le.size(); i += 4) {\
+            std::swap(le[i], le[i + 3]);\
+            std::swap(le[i + 1], le[i + 2]);\
+          }\
+          out->write(le.data(), le.size());\
+        } else\
+#endif\
+&|' "$fc"
+  grep -q '__ORDER_BIG_ENDIAN__' "$fc" \
+    || { echo "glslc: binary output write not found in file_compiler.cc" >&2; exit 1; }
 
   local cflags="" exelink=""
   case "$PLATFORM" in
