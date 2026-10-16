@@ -210,7 +210,7 @@ download_official_ndk() {
 # fork child instead, so the child still reseeds. arc4random itself stays the
 # official one, and kernels with the flag never take the fallback.
 patch_sysroot_arc4random() {
-  local work="$BUILD/arc4random" root libc lib triple api seen=" " n=0
+  local work="$BUILD/arc4random" root libc lib triple api syms seen=" " n=0
   mkdir -p "$work"
   for root in "$LINUX_NDK" "$NDK"; do
     # per-ABI libc.a, plus the per-API copies some releases ship (r25 betas)
@@ -223,8 +223,10 @@ patch_sysroot_arc4random() {
       rm -f "$work"/*.o
       ( cd "$work" && "$NDK_LLVM_BIN/llvm-ar" x "$libc" arc4random.o ) || continue
       # older NDKs have no madvise in arc4random; skip those and patched ones
-      "$NDK_LLVM_BIN/llvm-nm" -u "$work/arc4random.o" | grep -qw madvise || continue
-      ! "$NDK_LLVM_BIN/llvm-nm" "$work/arc4random.o" | grep -qw __arc4random_madvise || continue
+      # (grep the captured output: grep -q in a pipe trips pipefail via SIGPIPE)
+      syms="$("$NDK_LLVM_BIN/llvm-nm" "$work/arc4random.o")"
+      grep -qE ' U madvise$' <<<"$syms" || continue
+      ! grep -qw __arc4random_madvise <<<"$syms" || continue
       log "Patching arc4random.o in $libc"
       triple=$lib; [ "$lib" = arm-linux-androideabi ] && triple=armv7a-linux-androideabi
       # a per-API copy uses its own level; otherwise the lowest level this NDK
@@ -243,7 +245,8 @@ patch_sysroot_arc4random() {
         --redefine-sym __real_madvise=madvise "$work/compat0.o" "$work/compat.o"
       "$NDK_LLVM_BIN/ld.lld" -r -o "$work/merged.o" "$work/orig.o" "$work/compat.o"
       "$NDK_LLVM_BIN/llvm-objcopy" --localize-symbol=__arc4random_madvise "$work/merged.o" "$work/arc4random.o"
-      "$NDK_LLVM_BIN/llvm-nm" -u "$work/arc4random.o" | grep -qw pthread_atfork \
+      syms="$("$NDK_LLVM_BIN/llvm-nm" -u "$work/arc4random.o")"
+      grep -qw pthread_atfork <<<"$syms" \
         || { echo "patch_sysroot_arc4random: fallback missing from $libc" >&2; exit 1; }
       ( cd "$work" && "$NDK_LLVM_BIN/llvm-ar" r "$libc" arc4random.o )
       n=$((n + 1))
@@ -915,7 +918,8 @@ MODULE_BUILDTYPE=static
       done
     fi
     # bsd: the modules are dlopen()ed against the interpreter's own symbols.
-    if [ "$PLATFORM" = bsd ] && ! "$NDK_LLVM_BIN/llvm-readelf" --dyn-syms -W python | grep -q ' PyModule_Create2$'; then
+    # (capture first: grep -q in the pipe would trip pipefail via SIGPIPE)
+    if [ "$PLATFORM" = bsd ] && ! grep -q ' PyModule_Create2$' <<<"$("$NDK_LLVM_BIN/llvm-readelf" --dyn-syms -W python)"; then
       echo "python: interpreter does not export the C API (LINKFORSHARED); lib-dynload modules would not load" >&2
       exit 1
     fi
