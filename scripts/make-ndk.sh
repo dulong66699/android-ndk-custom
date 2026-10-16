@@ -218,11 +218,9 @@ patch_sysroot_arc4random() {
       case "$seen" in *" $libc "*) continue ;; esac
       seen="$seen$libc "
       lib="$(basename "$(dirname "$libc")")"
-      case "$lib" in
-        arm-linux-androideabi) triple=armv7a-linux-androideabi; api=21 ;;
-        riscv64-linux-android) triple=$lib; api=35 ;;
-        *) triple=$lib; api=21 ;;
-      esac
+      triple=$lib; [ "$lib" = arm-linux-androideabi ] && triple=armv7a-linux-androideabi
+      # lowest API level this NDK ships for the ABI (riscv64 starts at 35 or 37)
+      api="$(ls "$(dirname "$libc")" | grep -E '^[0-9]+$' | sort -n | head -n1)"
       rm -f "$work"/*.o
       ( cd "$work" && "$NDK_LLVM_BIN/llvm-ar" x "$libc" arc4random.o ) || continue
       # older NDKs have no madvise in arc4random; skip those and patched ones
