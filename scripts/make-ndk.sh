@@ -110,9 +110,10 @@ git_fetch() {
   fi
   until git -C "$work" fetch -q --depth 1 $filter origin "$ref"; do
     i=$((i + 1))
-    [ "$i" -ge 5 ] && { echo "git_fetch: $repo $ref failed after $i attempts" >&2; return 1; }
-    echo "git_fetch: $repo $ref failed, retry $i/5 in $((5 * i))s..." >&2
-    sleep $((5 * i))
+    # googlesource answers 503 under load (many parallel jobs); back off longer
+    [ "$i" -ge 8 ] && { echo "git_fetch: $repo $ref failed after $i attempts" >&2; return 1; }
+    echo "git_fetch: $repo $ref failed, retry $i/8 in $((15 * i + RANDOM % 15))s..." >&2
+    sleep $((15 * i + RANDOM % 15))
   done
   git -C "$work" checkout -q FETCH_HEAD
   rm -rf "$work/.git"
