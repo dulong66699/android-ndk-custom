@@ -502,8 +502,12 @@ build_pydeps() {
   # -fno-sanitize=undefined: these are prebuilt archives, so the ubsan runtime
   # is never linked in and __ubsan_handle_* would be left undefined.
   # MIPS -mabicalls needs -fPIC (a clang warning otherwise trips zlib's configure).
+  # bsd: the stdlib modules are shared objects there and link these archives
+  # in, so they must be PIC ("relocation ... recompile with -fPIC" otherwise,
+  # which silently drops zlib/_bz2/_lzma).
   local dcf="-fno-sanitize=undefined"
   case "$TARGET" in mips*) dcf="-fPIC $dcf" ;; esac
+  [ "$PLATFORM" = bsd ] && case "$dcf" in -fPIC*) ;; *) dcf="-fPIC $dcf" ;; esac
 
   if [ ! -f "$PYDEPS/lib/libz.a" ]; then
     ( cd "$BUILD"
@@ -606,8 +610,23 @@ build_python() {
       rm -rf python; mv Python-3.11.4 python
     fi
     cd python
-    # the bsd configure carries the Darwin cross-build fixups too
-    case "$PLATFORM" in bsd|macos) cp "$ROOT/patches/bsd/python/configure" "$PWD/configure" ;; esac
+    # bsd/macos: upstream configure refuses cross builds to hosts it does not
+    # know ("cross build not supported"). Let them through: ac_sys_system comes
+    # from $HOST_NAME (empty -> generic platform), the platform tag takes any
+    # cpu (arm* folded to arm), and with no MODULE_BUILDTYPE default setup.py
+    # builds the stdlib modules as shared objects.
+    case "$PLATFORM" in bsd|macos)
+      sed -i '0,/^\t\tMACHDEP="unknown"$/{/^\t\tMACHDEP="unknown"$/d}' configure
+      sed -i '0,/^\t\tas_fn_error \$? "cross build not supported for \$host" "\$LINENO" 5$/s//\t\tac_sys_system=$HOST_NAME/' configure
+      sed -i '/^\t\tMACHDEP="unknown"$/{N;s/^\t\tMACHDEP="unknown"\n\t\tas_fn_error \$? "cross build not supported for \$host" "\$LINENO" 5$/\t\t:/}' configure
+      sed -i 's/^\t_PYTHON_HOST_PLATFORM="\$MACHDEP\${_host_cpu:+-\$_host_cpu}"$/\tcase "$host_cpu" in arm*) _host_cpu=arm ;; *) _host_cpu=$host_cpu ;; esac\n&/' configure
+      sed -i -e 's/^    MODULE_BUILDTYPE=static ;; #($/    : ;; #(/' \
+             -e 's/^    MODULE_BUILDTYPE=\${MODULE_BUILDTYPE:-shared}$/    :/' configure
+      if grep -q 'cross build not supported' configure || grep -q 'MODULE_BUILDTYPE=\${MODULE_BUILDTYPE' configure \
+         || [ "$(grep -c 'ac_sys_system=\$HOST_NAME\|_host_cpu=arm ;;' configure)" != 2 ]; then
+        echo "python: configure cross-build edits did not apply" >&2; exit 1
+      fi ;;
+    esac
     # OpenBSD: thread_pthread.h calls getthrid() under #ifdef __OpenBSD__ (not a
     # HAVE_ knob); zig's headers don't declare it, so inject a forward decl.
     if [ "$SYSTEM_NAME" = OpenBSD ]; then
@@ -796,9 +815,13 @@ MODULE_BUILDTYPE=static
               # nis: OpenBSD dropped YP/NIS (no rpcsvc/yp_prot.h), so mark n/a.
               local obsd="" nisna=""
               if [ "$SYSTEM_NAME" = OpenBSD ]; then obsd="-D_BSD_SOURCE"; nisna="py_cv_module_nis=n/a"; fi
+              # LINKFORSHARED: for the same "unknown" platform configure leaves it
+              # empty, so python3 exports no Py* symbols and every lib-dynload
+              # module (_struct, _posixsubprocess, ...) fails to load.
               args+=( CFLAGS="-fPIC -Wno-error=date-time $obsd $CROSS_CFLAGS"
                       CXXFLAGS="-fPIC -Wno-error=date-time $obsd $CROSS_CFLAGS"
-                      LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS" $nisna ) ;;
+                      LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS" $nisna
+                      LINKFORSHARED="-Wl,--export-dynamic" ) ;;
       macos)  # _DARWIN_C_SOURCE: expose BSD extensions masked by _POSIX_C_SOURCE.
               # LDSHARED -bundle -undefined dynamic_lookup: defer Python API
               # symbols to the interpreter at dlopen().
@@ -828,10 +851,9 @@ MODULE_BUILDTYPE=static
     [ "${PIPESTATUS[0]}" = 0 ] || exit 1
     # setup.py only warns when stdlib extensions fail to build; a python3
     # without _struct/zlib/... breaks ndk-stack and every script, so fail here
-    # when one of those is missing. Linux only: _ctypes is expected to fail
-    # there (no libffi for most targets), and bsd already lacks more (zlib,
-    # _bz2, _lzma on some targets).
-    if [ "$PLATFORM" = linux ]; then
+    # when one of those is missing. linux/bsd only: _ctypes is expected to fail
+    # (no libffi for some targets), so it is not in the list.
+    if [ "$PLATFORM" = linux ] || [ "$PLATFORM" = bsd ]; then
       local failed
       failed="$(awk '/^Failed to build these modules:/{f=1;next} f&&!NF{f=0} f' build_all.log)"
       for m in _struct zlib binascii _posixsubprocess select math _json _bz2 _lzma; do
@@ -840,6 +862,11 @@ MODULE_BUILDTYPE=static
           echo "$failed" >&2; exit 1
         fi
       done
+    fi
+    # bsd: the modules are dlopen()ed against the interpreter's own symbols.
+    if [ "$PLATFORM" = bsd ] && ! "$NDK_LLVM_BIN/llvm-readelf" --dyn-syms -W python | grep -q ' PyModule_Create2$'; then
+      echo "python: interpreter does not export the C API (LINKFORSHARED); lib-dynload modules would not load" >&2
+      exit 1
     fi
     make install
   )
@@ -913,6 +940,7 @@ assemble_unix() {
   fi
 
   fixup_host_arch
+  fixup_host_tag_fallback
   [ "$PLATFORM" = bsd ] && fixup_bsd_host_os
   [ "$PLATFORM" = macos ] && fixup_macos_host_os
 
@@ -983,6 +1011,29 @@ fixup_bsd_host_os() {
          -e '/case \$HOST_OS in/a \
 NetBSD) HOST_OS=netbsd;;\
 OpenBSD) HOST_OS=openbsd;;' "$NDK/build/tools/ndk_bin_common.sh"
+  # build/core/init.mk only knows Linux/Darwin ("Unable to determine HOST_OS from
+  # uname -s: FreeBSD"). Treat the BSDs like a Linux host: its HOST_TAG64
+  # (linux-x86_64) is the compatibility symlink rename_host points at our dir.
+  sed -i 's|^\( *\)# We should not be there, but just in case !|\1ifneq (,$(filter FreeBSD NetBSD OpenBSD,$(UNAME)))\n\1    HOST_OS := linux\n\1endif\n&|' "$NDK/build/core/init.mk"
+  grep -q 'filter FreeBSD NetBSD OpenBSD' "$NDK/build/core/init.mk" \
+    || { echo "init.mk: BSD host detection not patched" >&2; exit 1; }
+}
+
+# ndk_bin_common.sh: uname -m spellings vary (NetBSD evbarm/earmv7hf, FreeBSD
+# powerpc for ppc64, i686 hosts whose dir is <os>-i686, mips*el ...). Each NDK
+# ships exactly one host, so when the computed tag has no prebuilt dir, use the
+# shipped one instead of failing.
+fixup_host_tag_fallback() {
+  sed -i 's|^  \*) echo "ERROR: Unknown host CPU architecture: \$HOST_ARCH"; exit 1;;$|  *) ;;|' \
+    "$NDK/build/tools/ndk_bin_common.sh"
+  sed -i '/^HOST_TAG=\$HOST_OS-\$HOST_ARCH$/a \
+if [ ! -d "$ANDROID_NDK_ROOT/prebuilt/$HOST_TAG" ]; then\
+  for _d in "$ANDROID_NDK_ROOT"/prebuilt/*; do\
+    [ -d "$_d" ] \&\& [ ! -L "$_d" ] \&\& HOST_TAG=${_d##*/}\
+  done\
+fi' "$NDK/build/tools/ndk_bin_common.sh"
+  grep -q 'ANDROID_NDK_ROOT"/prebuilt/\*' "$NDK/build/tools/ndk_bin_common.sh" \
+    || { echo "ndk_bin_common.sh: host tag fallback not patched" >&2; exit 1; }
 }
 
 # macos: stock ndk_bin_common.sh folds darwin-arm64 onto darwin-x86_64 (Google
