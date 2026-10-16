@@ -213,11 +213,13 @@ patch_sysroot_arc4random() {
   local work="$BUILD/arc4random" root libc lib triple api seen=" " n=0
   mkdir -p "$work"
   for root in "$LINUX_NDK" "$NDK"; do
-    for libc in "$root"/toolchains/llvm/prebuilt/*/sysroot/usr/lib/*/libc.a; do
+    # per-ABI libc.a, plus the per-API copies some releases ship (r25 betas)
+    for libc in "$root"/toolchains/llvm/prebuilt/*/sysroot/usr/lib/*/libc.a \
+                "$root"/toolchains/llvm/prebuilt/*/sysroot/usr/lib/*/[0-9]*/libc.a; do
       [ -f "$libc" ] || continue
       case "$seen" in *" $libc "*) continue ;; esac
       seen="$seen$libc "
-      lib="$(basename "$(dirname "$libc")")"
+      lib="${libc%/libc.a}"; lib="${lib##*/sysroot/usr/lib/}"; lib="${lib%%/*}"
       rm -f "$work"/*.o
       ( cd "$work" && "$NDK_LLVM_BIN/llvm-ar" x "$libc" arc4random.o ) || continue
       # older NDKs have no madvise in arc4random; skip those and patched ones
@@ -225,9 +227,13 @@ patch_sysroot_arc4random() {
       ! "$NDK_LLVM_BIN/llvm-nm" "$work/arc4random.o" | grep -qw __arc4random_madvise || continue
       log "Patching arc4random.o in $libc"
       triple=$lib; [ "$lib" = arm-linux-androideabi ] && triple=armv7a-linux-androideabi
-      # lowest API level this NDK ships for the ABI: 21, riscv64 36 (r30 betas)
-      # or 37 (r30). The headers reject an unversioned triple, so fall back to 21.
-      api="$(ls "$(dirname "$libc")" | grep -E '^[0-9]+$' | sort -n | head -n1 || true)"
+      # a per-API copy uses its own level; otherwise the lowest level this NDK
+      # ships for the ABI (21; riscv64 35-37). The headers reject an unversioned
+      # triple, so fall back to 21.
+      api="$(basename "$(dirname "$libc")")"
+      case "$api" in
+        *[!0-9]*) api="$(ls "$(dirname "$libc")" | grep -E '^[0-9]+$' | sort -n | head -n1 || true)" ;;
+      esac
       api="${api:-21}"
       "$NDK_LLVM_BIN/llvm-objcopy" --redefine-sym madvise=__arc4random_madvise \
         "$work/arc4random.o" "$work/orig.o"
