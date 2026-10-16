@@ -201,6 +201,51 @@ download_official_ndk() {
   YASM_VERSION=$("$LINUX_NDK/prebuilt/linux-x86_64/bin/yasm" --version | sed -n '1s/.*yasm \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
 }
 
+# --- sysroot libc.a: survive kernels without MADV_WIPEONFORK -----------------
+# Newer bionic's arc4random aborts when madvise(MADV_WIPEONFORK) fails, which
+# it does with EINVAL on kernels before 4.14, so every -static program built
+# with the NDK died at startup there ("arc4random data MADV_WIPEONFORK failed").
+# Point that one madvise call in libc.a's arc4random.o at the same fallback the
+# host tools use (wipeonfork_compat.c): on EINVAL the range is cleared in the
+# fork child instead, so the child still reseeds. arc4random itself stays the
+# official one, and kernels with the flag never take the fallback.
+patch_sysroot_arc4random() {
+  local work="$BUILD/arc4random" root libc lib triple api seen=" " n=0
+  mkdir -p "$work"
+  for root in "$LINUX_NDK" "$NDK"; do
+    for libc in "$root"/toolchains/llvm/prebuilt/*/sysroot/usr/lib/*/libc.a; do
+      [ -f "$libc" ] || continue
+      case "$seen" in *" $libc "*) continue ;; esac
+      seen="$seen$libc "
+      lib="$(basename "$(dirname "$libc")")"
+      case "$lib" in
+        arm-linux-androideabi) triple=armv7a-linux-androideabi; api=21 ;;
+        riscv64-linux-android) triple=$lib; api=35 ;;
+        *) triple=$lib; api=21 ;;
+      esac
+      rm -f "$work"/*.o
+      ( cd "$work" && "$NDK_LLVM_BIN/llvm-ar" x "$libc" arc4random.o ) || continue
+      # older NDKs have no madvise in arc4random; skip those and patched ones
+      "$NDK_LLVM_BIN/llvm-nm" -u "$work/arc4random.o" | grep -qw madvise || continue
+      ! "$NDK_LLVM_BIN/llvm-nm" "$work/arc4random.o" | grep -qw __arc4random_madvise || continue
+      log "Patching arc4random.o in $libc"
+      "$NDK_LLVM_BIN/llvm-objcopy" --redefine-sym madvise=__arc4random_madvise \
+        "$work/arc4random.o" "$work/orig.o"
+      "$NDK_LLVM_BIN/clang" --target="$triple$api" -O2 -fPIC \
+        -c "$ROOT/patches/bionic/wipeonfork_compat.c" -o "$work/compat0.o"
+      "$NDK_LLVM_BIN/llvm-objcopy" --redefine-sym __wrap_madvise=__arc4random_madvise \
+        --redefine-sym __real_madvise=madvise "$work/compat0.o" "$work/compat.o"
+      "$NDK_LLVM_BIN/ld.lld" -r -o "$work/merged.o" "$work/orig.o" "$work/compat.o"
+      "$NDK_LLVM_BIN/llvm-objcopy" --localize-symbol=__arc4random_madvise "$work/merged.o" "$work/arc4random.o"
+      "$NDK_LLVM_BIN/llvm-nm" -u "$work/arc4random.o" | grep -qw pthread_atfork \
+        || { echo "patch_sysroot_arc4random: fallback missing from $libc" >&2; exit 1; }
+      ( cd "$work" && "$NDK_LLVM_BIN/llvm-ar" r "$libc" arc4random.o )
+      n=$((n + 1))
+    done
+  done
+  log "arc4random.o patched in $n libc.a"
+}
+
 # --- toolchain selection (mirrors build.sh's case "$PLATFORM") -------------
 setup_toolchain() {
   CROSS_CFLAGS="-fno-sanitize=undefined"; CROSS_LDFLAGS=""; SYSTEM_NAME=Linux
@@ -1349,6 +1394,7 @@ archive() {
 
 # --- orchestrate ------------------------------------------------------------
 download_official_ndk
+patch_sysroot_arc4random
 setup_toolchain
 build_make
 build_yasm
