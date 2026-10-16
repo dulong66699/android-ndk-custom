@@ -1396,7 +1396,7 @@ archive() {
   parent="$(dirname "$NDK")"; base="$(basename "$NDK")"
   # Ad-hoc (re)sign what strip broke; Apple Silicon kills unsigned binaries.
   if [ "$PLATFORM" = macos ]; then
-    "$(dirname -- "$0")/macos-sign.sh" "$NDK"
+    "$ROOT/scripts/macos-sign.sh" "$NDK"
   fi
   if [ "$PLATFORM" = windows ]; then
     out="$ROOTDIR/${NDK_NAME}-${TARGET}.7z"
