@@ -735,6 +735,12 @@ build_python() {
       sed -i 's|^PY_STDLIB_MOD(\[_uuid\],|have_uuid=yes\nLIBUUID_LIBS="-lrpcrt4"\nPY_STDLIB_MOD([_uuid],|' configure.ac
       grep -q '^LIBUUID_LIBS="-lrpcrt4"' configure.ac \
         || { echo "_uuid: PY_STDLIB_MOD([_uuid], ...) not found in configure.ac" >&2; exit 1; }
+      # arm64ec: the fork's PYD_PLATFORM_TAG map has no entry for it, so the
+      # extensions install as *.cpython-311.pyd while python.exe only looks for
+      # *.cp311-.pyd / *.pyd, and zlib, _struct, _bz2, ... fail to import.
+      sed -i 's|^  armv7-\*-mingw\*)$|  arm64ec-*-mingw*)\n    PYD_PLATFORM_TAG+="mingw_arm64ec"\n    ;;\n&|' configure.ac
+      grep -q 'PYD_PLATFORM_TAG+="mingw_arm64ec"' configure.ac \
+        || { echo "PYD_PLATFORM_TAG: armv7 case not found in configure.ac" >&2; exit 1; }
     fi
     # windows: regenerate configure from the patched configure.ac
     [ "$PLATFORM" = windows ] && autoreconf -vfi
