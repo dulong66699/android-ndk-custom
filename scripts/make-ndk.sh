@@ -218,15 +218,17 @@ patch_sysroot_arc4random() {
       case "$seen" in *" $libc "*) continue ;; esac
       seen="$seen$libc "
       lib="$(basename "$(dirname "$libc")")"
-      triple=$lib; [ "$lib" = arm-linux-androideabi ] && triple=armv7a-linux-androideabi
-      # lowest API level this NDK ships for the ABI (riscv64 starts at 35 or 37)
-      api="$(ls "$(dirname "$libc")" | grep -E '^[0-9]+$' | sort -n | head -n1)"
       rm -f "$work"/*.o
       ( cd "$work" && "$NDK_LLVM_BIN/llvm-ar" x "$libc" arc4random.o ) || continue
       # older NDKs have no madvise in arc4random; skip those and patched ones
       "$NDK_LLVM_BIN/llvm-nm" -u "$work/arc4random.o" | grep -qw madvise || continue
       ! "$NDK_LLVM_BIN/llvm-nm" "$work/arc4random.o" | grep -qw __arc4random_madvise || continue
       log "Patching arc4random.o in $libc"
+      triple=$lib; [ "$lib" = arm-linux-androideabi ] && triple=armv7a-linux-androideabi
+      # lowest API level this NDK ships for the ABI: 21, riscv64 36 (r30 betas)
+      # or 37 (r30). The headers reject an unversioned triple, so fall back to 21.
+      api="$(ls "$(dirname "$libc")" | grep -E '^[0-9]+$' | sort -n | head -n1 || true)"
+      api="${api:-21}"
       "$NDK_LLVM_BIN/llvm-objcopy" --redefine-sym madvise=__arc4random_madvise \
         "$work/arc4random.o" "$work/orig.o"
       "$NDK_LLVM_BIN/clang" --target="$triple$api" -O2 -fPIC \
