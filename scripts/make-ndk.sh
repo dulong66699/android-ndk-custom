@@ -687,9 +687,6 @@ build_pydeps() {
         --disable-shared --enable-static --disable-docs --disable-multi-os-directory \
         CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="$ffi_cf" \
         "${ffi_args[@]}"
-      # libtool's OpenBSD install step runs `ranlib -t`, which zig's ranlib
-      # rejects.
-      find . -name libtool -exec sed -i 's/\$RANLIB -t /$RANLIB /' {} +
       make -j"$(ncpu)" install
       # libffi installs its headers under lib/libffi-*/include on some layouts.
       for h in "$PYDEPS"/lib/libffi-*/include/*.h; do [ -f "$h" ] && cp -f "$h" "$PYDEPS/include/"; done
