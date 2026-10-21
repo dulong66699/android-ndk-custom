@@ -667,6 +667,10 @@ build_pydeps() {
       sed -i -e 's/^\(  mips\*-\*linux\* | mips\*-\*-openbsd\* | mips\*-\*-freebsd\*\))$/\1 | mips*-*-netbsd*)/' \
              -e 's/^\(  powerpc64-\*-freebsd\* | powerpc64le-\*-freebsd\*\))$/\1 | powerpc64-*-openbsd*)/' configure.host
       sed -i 's/^#elif !defined(__OpenBSD__) && !defined(__FreeBSD__)$/& \&\& !defined(__NetBSD__)/' src/mips/ffitarget.h
+      # x32: configure.host tells x32 from i386 with a `cc -Werror -S` probe,
+      # which fails under the zig wrapper (see ffi_args), so x32 got the i386
+      # backend and none of the X86_64 symbols. Compile to an object instead.
+      sed -i 's/^\(\t  if \$CC \$CFLAGS -Werror\) -S conftest.c -o conftest.s\( > \/dev\/null 2>&1; then\)$/\1 -c conftest.c -o conftest.o\2/' configure.host
       # mips: the hand-written .eh_frame tables address their functions with
       # absolute (absptr) pointers in a read-only section, which lld refuses in
       # a shared object (R_MIPS_32/R_MIPS_64 "recompile with -fPIC"). Switch
@@ -678,6 +682,7 @@ build_pydeps() {
              -e 's/^\([ \t]*\)FDE_ADDR_BYTES\([ \t]*\)\(\.LFB[0-9]\)\(\t*# initial_location\.\)$/\1.4byte\2\3-.\4/' \
              -e 's/^\([ \t]*\)FDE_ADDR_BYTES\([ \t]*\)\(\.LFE[0-9]-\.LFB[0-9]\)\(\t*# address_range\.\)$/\1.4byte\2\3\4\n\1.uleb128 0x0\t\t# Augmentation size/' src/mips/n32.S
       if [ "$(grep -c 'mips\*-\*-netbsd\*)$\|powerpc64-\*-openbsd\*)$' configure.host)" != 2 ] \
+         || ! grep -q 'Werror -c conftest.c -o conftest.o' configure.host \
          || ! grep -q '!defined(__NetBSD__)$' src/mips/ffitarget.h \
          || [ "$(grep -c 'LFB[0-9]-\.' src/mips/o32.S)" != 3 ] || [ "$(grep -c 'LFB[0-9]-\.' src/mips/n32.S)" != 3 ] \
          || [ "$(grep -c 'Augmentation size' src/mips/n32.S)" != 4 ] || grep -q 'FDE_ADDR_BYTES' src/mips/n32.S; then
