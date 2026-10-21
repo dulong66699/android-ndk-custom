@@ -493,6 +493,27 @@ build_shaderc() {
   if [ "$PLATFORM" = bionic ]; then
     sed -i '/^elseif(UNIX)$/,/^[[:space:]]*endif()$/d' "$SH/third_party/glslang/StandAlone/CMakeLists.txt"
   fi
+  # glslang compiles SPIRV/doc.cpp into both libSPIRV and libSPVRemapper.
+  # Zig's Elf2 linker loads every archive member,
+  # so spirv-remap ends up with two definitions of spv::SourceString.
+  # Keep doc.cpp only in SPIRV and make SPVRemapper depend on it; this is the CMake
+  # part of upstream glslang 33585c87.
+  case "$TARGET" in
+    sparc64-*)
+      glslang_cmake="$SH/third_party/glslang/SPIRV/CMakeLists.txt"
+      sed -i -e '/^[[:space:]]*SPVRemapper\.cpp$/s/$/)/' \
+        -e '/^[[:space:]]*doc\.cpp)$/d' \
+        -e '/^[[:space:]]*add_library(SPVRemapper .*SPVREMAP_SOURCES/a\
+    target_link_libraries(SPVRemapper PRIVATE SPIRV)' \
+        "$glslang_cmake"
+      if ! grep -q 'target_link_libraries(SPVRemapper PRIVATE SPIRV)' "$glslang_cmake" ||
+         grep -q '^[[:space:]]*doc\.cpp)$' "$glslang_cmake" ||
+         ! grep -q '^[[:space:]]*SPVRemapper\.cpp)$' "$glslang_cmake"; then
+        echo "glslang: failed to patch SPVRemapper for Elf2" >&2
+        exit 1
+      fi
+      ;;
+  esac
   ( cd "$SH/third_party/spirv-tools" && git init --quiet && git apply "$ROOT/patches/ndk/spirv/full_static.patch" && rm -rf .git )
   ( cd "$SH" && git init --quiet && git apply "$ROOT/patches/ndk/shaderc/full_static.patch" && rm -rf .git )
   # big-endian hosts: glslc writes the SPIR-V words in host byte order, but
