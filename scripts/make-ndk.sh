@@ -874,9 +874,11 @@ MODULE_BUILDTYPE=static
       # _ctypes is not in 3.11's Setup.stdlib, so setup.py still builds it as
       # a .so the static interpreter cannot load ("libdl.a is a stub"). Build it
       # in via Setup.local (makesetup reads it; setup.py then skips the module).
+      # bionic: older NDKs (r28 and earlier) keep dlopen() & co. in libdl.a only.
       if [ -f "$PYDEPS/lib/libffi.a" ]; then
-        printf '*static*\n_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -I%s/include -L%s/lib -lffi -DHAVE_FFI_PREP_CIF_VAR -DHAVE_FFI_PREP_CLOSURE_LOC -DHAVE_FFI_CLOSURE_ALLOC\n' \
-          "$PYDEPS" "$PYDEPS" > Modules/Setup.local
+        local ctypes_dl=""; [ "$PLATFORM" = bionic ] && ctypes_dl=" -ldl"
+        printf '*static*\n_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -I%s/include -L%s/lib -lffi%s -DHAVE_FFI_PREP_CIF_VAR -DHAVE_FFI_PREP_CLOSURE_LOC -DHAVE_FFI_CLOSURE_ALLOC\n' \
+          "$PYDEPS" "$PYDEPS" "$ctypes_dl" > Modules/Setup.local
       fi
       # ctypes.pythonapi is PyDLL(None), i.e. dlopen(NULL), which fails without
       # a dynamic loader and would make `import ctypes` itself fail.
