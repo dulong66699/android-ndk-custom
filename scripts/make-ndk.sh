@@ -391,6 +391,12 @@ build_make() {
         git apply "$ROOT/patches/windows/make/$p"
       done
       rm -rf .git
+      # mingw runs jobs through the w32 process API, not waitpid()/wait3(), and
+      # configure forces the jobserver on there anyway; the "neither waitpid()
+      # nor wait3()" warning is the only other effect of this flag.
+      sed -i 's/^  has_wait_nohang=no$/  has_wait_nohang=yes/' configure
+      [ "$(grep -c '^  has_wait_nohang=yes$' configure)" = 2 ] \
+        || { echo "make: has_wait_nohang edit did not apply" >&2; exit 1; }
     fi
     # bionic has getloadavg only from API 29; job.c reads /proc/loadavg first,
     # so below that just report it as unsupported.
@@ -638,13 +644,52 @@ build_pydeps() {
     # libffi has no hexagon port, and its loongarch64 assembly rejects the
     # f32/sf ABI variants. Those targets ship without _ctypes rather than
     # failing the whole NDK.
+    local ffi_cf="$dcf" ffi_args=()
+    # zig (linux/bsd): the wrapper adds -c to configure's `cc -Werror -S`
+    # hidden-visibility probe, which then fails, so the assembly exports its
+    # internal symbols and _ctypes.so cannot link them (R_386_PC32 against
+    # __x86.get_pc_thunk.bx, R_390_PC32DBL, ...). Every zig target has it.
+    case "$PLATFORM" in linux|bsd) ffi_args+=( libffi_cv_hidden_visibility_attribute=yes ) ;; esac
+    # linux: the shared _ctypes.so links this archive in, so it must be PIC
+    # (mips and bsd already are, see dcf).
+    if [ "$PLATFORM" = linux ]; then case "$ffi_cf" in -fPIC*) ;; *) ffi_cf="-fPIC $ffi_cf" ;; esac; fi
+    # NetBSD mips: its cacheflush() is missing from zig's libc stubs; the
+    # builtin goes through compiler-rt, which issues sysarch() itself.
+    case "$TARGET" in mips*-netbsd-*) ffi_cf="$ffi_cf -DUSE__BUILTIN___CLEAR_CACHE=1" ;; esac
     ( cd "$BUILD"
       fetch_unpack https://github.com/libffi/libffi/releases/download/v3.4.6/libffi-3.4.6.tar.gz /tmp/libffi.tar.gz
       cd libffi-3.4.6
       cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" .
+      # mips NetBSD and powerpc64 OpenBSD use the same ABIs as their FreeBSD/
+      # OpenBSD siblings, but configure.host lists neither ("not ported").
+      # NetBSD has no <sgidefs.h>; clang predefines the _MIPS_SIM values, as
+      # libffi already relies on for Free/OpenBSD.
+      sed -i -e 's/^\(  mips\*-\*linux\* | mips\*-\*-openbsd\* | mips\*-\*-freebsd\*\))$/\1 | mips*-*-netbsd*)/' \
+             -e 's/^\(  powerpc64-\*-freebsd\* | powerpc64le-\*-freebsd\*\))$/\1 | powerpc64-*-openbsd*)/' configure.host
+      sed -i 's/^#elif !defined(__OpenBSD__) && !defined(__FreeBSD__)$/& \&\& !defined(__NetBSD__)/' src/mips/ffitarget.h
+      # mips: the hand-written .eh_frame tables address their functions with
+      # absolute (absptr) pointers in a read-only section, which lld refuses in
+      # a shared object (R_MIPS_32/R_MIPS_64 "recompile with -fPIC"). Switch
+      # them to pc-relative sdata4, as the compiler emits for C code.
+      sed -i -e 's/^\(\t\.byte\t\)0x00\(\t # FDE Encoding\) (absptr)$/\10x1b\2 (pcrel|sdata4)/' \
+             -e 's/^\(\t\.4byte\t\)\(\$LFB[0-9]\)\(\t # FDE initial location\)$/\1\2-.\3/' src/mips/o32.S
+      sed -i -e 's/^\( *\.ascii *\)"\\000"\(\t*# Augmentation\)$/\1"zR\\000"\2/' \
+             -e 's/^\( *\.byte *0x1f\t*# Return Address \$31\)$/\1\n\t.uleb128 0x1\t\t\t# Augmentation size\n\t.byte\t0x1b\t\t\t# FDE Encoding (pcrel|sdata4)/' \
+             -e 's/^\([ \t]*\)FDE_ADDR_BYTES\([ \t]*\)\(\.LFB[0-9]\)\(\t*# initial_location\.\)$/\1.4byte\2\3-.\4/' \
+             -e 's/^\([ \t]*\)FDE_ADDR_BYTES\([ \t]*\)\(\.LFE[0-9]-\.LFB[0-9]\)\(\t*# address_range\.\)$/\1.4byte\2\3\4\n\1.uleb128 0x0\t\t# Augmentation size/' src/mips/n32.S
+      if [ "$(grep -c 'mips\*-\*-netbsd\*)$\|powerpc64-\*-openbsd\*)$' configure.host)" != 2 ] \
+         || ! grep -q '!defined(__NetBSD__)$' src/mips/ffitarget.h \
+         || [ "$(grep -c 'LFB[0-9]-\.' src/mips/o32.S)" != 3 ] || [ "$(grep -c 'LFB[0-9]-\.' src/mips/n32.S)" != 3 ] \
+         || [ "$(grep -c 'Augmentation size' src/mips/n32.S)" != 4 ] || grep -q 'FDE_ADDR_BYTES' src/mips/n32.S; then
+        echo "libffi: source edits did not apply" >&2; exit 1
+      fi
       ./configure --prefix="$PYDEPS" --build=x86_64-linux-gnu --host="$ffi_host" \
         --disable-shared --enable-static --disable-docs --disable-multi-os-directory \
-        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="$dcf"
+        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="$ffi_cf" \
+        "${ffi_args[@]}"
+      # libtool's OpenBSD install step runs `ranlib -t`, which zig's ranlib
+      # rejects.
+      find . -name libtool -exec sed -i 's/\$RANLIB -t /$RANLIB /' {} +
       make -j"$(ncpu)" install
       # libffi installs its headers under lib/libffi-*/include on some layouts.
       for h in "$PYDEPS"/lib/libffi-*/include/*.h; do [ -f "$h" ] && cp -f "$h" "$PYDEPS/include/"; done
@@ -824,6 +869,18 @@ EOF
 MODULE_BUILDTYPE=static
 ' configure
       sed -i 's#^\([[:space:]]*\)MODULES_SETUP_STDLIB=$#\1MODULES_SETUP_STDLIB=Modules/Setup.stdlib#' configure
+      # _ctypes is not in 3.11's Setup.stdlib, so setup.py still builds it as
+      # a .so the static interpreter cannot load ("libdl.a is a stub"). Build it
+      # in via Setup.local (makesetup reads it; setup.py then skips the module).
+      if [ -f "$PYDEPS/lib/libffi.a" ]; then
+        printf '*static*\n_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -I%s/include -L%s/lib -lffi -DHAVE_FFI_PREP_CIF_VAR -DHAVE_FFI_PREP_CLOSURE_LOC -DHAVE_FFI_CLOSURE_ALLOC\n' \
+          "$PYDEPS" "$PYDEPS" > Modules/Setup.local
+      fi
+      # ctypes.pythonapi is PyDLL(None), i.e. dlopen(NULL), which fails without
+      # a dynamic loader and would make `import ctypes` itself fail.
+      sed -i 's/^    pythonapi = PyDLL(None)$/    try:\n        pythonapi = PyDLL(None)\n    except OSError:  # NDK: static interpreter, no dlopen()\n        pythonapi = None/' Lib/ctypes/__init__.py
+      grep -q 'NDK: static interpreter, no dlopen()' Lib/ctypes/__init__.py \
+        || { echo "ctypes: pythonapi = PyDLL(None) not found" >&2; exit 1; }
     fi
     # linux/bsd (zig): neuter setup.py's add_cross_compiling_paths() and
     # add_multiarch_paths(). Their `$(CC) -E -v` / `$(CC) -print-multiarch`
@@ -847,8 +904,11 @@ MODULE_BUILDTYPE=static
                  READELF="$NDK_LLVM_BIN/llvm-readelf" LLVM_PROFDATA="$NDK_LLVM_BIN/llvm-profdata"
                  AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     # mingw is a shared build (libpython3.11.dll); every other host is static.
+    # --without-readline: no readline is cross-built. macOS's SDK satisfies
+    # configure's -lreadline probe, but setup.py cannot locate the library and
+    # hands None to its readelf probe ("llvm-readelf: error: 'None'").
     if [ "$PLATFORM" != windows ]; then
-      args+=( --disable-shared --disable-ipv6 LDSHARED="$CROSS_CC -shared -fPIC"
+      args+=( --disable-shared --disable-ipv6 --without-readline LDSHARED="$CROSS_CC -shared -fPIC"
               _PYTHON_HOST_PLATFORM="$TARGET" )
     fi
     # _ctypes_test: test-only, unused.
@@ -933,12 +993,13 @@ MODULE_BUILDTYPE=static
     [ "${PIPESTATUS[0]}" = 0 ] || exit 1
     # setup.py only warns when stdlib extensions fail to build; a python3
     # without _struct/zlib/... breaks ndk-stack and every script, so fail here
-    # when one of those is missing. linux/bsd only: _ctypes is expected to fail
-    # (no libffi for some targets), so it is not in the list.
+    # when one of those is missing. linux/bsd only. _ctypes counts whenever
+    # libffi built (hexagon has no libffi port).
     if [ "$PLATFORM" = linux ] || [ "$PLATFORM" = bsd ]; then
-      local failed
+      local failed req="_struct zlib binascii _posixsubprocess select math _json _bz2 _lzma"
+      [ -f "$PYDEPS/lib/libffi.a" ] && req="$req _ctypes"
       failed="$(awk '/^Failed to build these modules:/{f=1;next} f&&!NF{f=0} f' build_all.log)"
-      for m in _struct zlib binascii _posixsubprocess select math _json _bz2 _lzma; do
+      for m in $req; do
         if printf '%s\n' $failed | grep -qx "$m"; then
           echo "python: required stdlib module $m failed to build:" >&2
           echo "$failed" >&2; exit 1
