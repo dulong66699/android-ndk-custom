@@ -901,9 +901,6 @@ MODULE_BUILDTYPE=static
                  READELF="$NDK_LLVM_BIN/llvm-readelf" LLVM_PROFDATA="$NDK_LLVM_BIN/llvm-profdata"
                  AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     # mingw is a shared build (libpython3.11.dll); every other host is static.
-    # --without-readline: no readline is cross-built. macOS's SDK satisfies
-    # configure's -lreadline probe, but setup.py cannot locate the library and
-    # hands None to its readelf probe ("llvm-readelf: error: 'None'").
     if [ "$PLATFORM" != windows ]; then
       args+=( --disable-shared --disable-ipv6 --without-readline LDSHARED="$CROSS_CC -shared -fPIC"
               _PYTHON_HOST_PLATFORM="$TARGET" )
