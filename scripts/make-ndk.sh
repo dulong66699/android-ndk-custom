@@ -306,8 +306,8 @@ setup_toolchain() {
       CROSS_RANLIB="$TC/bin/ranlib"; CROSS_STRIP="$TC/bin/strip"; CROSS_OBJCOPY="$TC/bin/objcopy"
       NDK_HOST=linux-x86_64
       case "$TARGET" in
-        *musl*) CROSS_CFLAGS="-static -fno-sanitize=undefined"; CROSS_LDFLAGS="-static" ;;
-        *)      CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
+        *musl*) CROSS_CFLAGS="-fstack-clash-protection -fstack-protector-strong -static -fno-sanitize=undefined"; CROSS_LDFLAGS="-static" ;;
+        *)      CROSS_LDFLAGS="-Wl,--as-needed -Wl,-z,relro,-z,now -static-libstdc++ -static-libgcc" ;;
       esac
       ;;
     bsd)
@@ -415,7 +415,7 @@ build_make() {
                        ac_cv_lib_elf_elf_begin=no am_cv_func_iconv=no ac_cv_func_pselect=yes ) ;;
       linux)   args+=( CFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
                        CXXFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
-                       LDFLAGS="$CROSS_LDFLAGS" )
+                       LDFLAGS="-s $CROSS_LDFLAGS" )
 
         case "$TARGET" in
           *musl*)
@@ -455,7 +455,7 @@ build_yasm() {
       bionic)  args+=( LDFLAGS="-static $BIONIC_EXE_LDFLAGS" ) ;;
       linux)    args+=( CFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
                        CXXFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
-                       LDFLAGS="$CROSS_LDFLAGS" ) ;;
+                       LDFLAGS="-s $CROSS_LDFLAGS" ) ;;
       bsd)     args+=( CFLAGS="-fwrapv $CROSS_CFLAGS" CXXFLAGS="-fwrapv $CROSS_CFLAGS"
                        LDFLAGS="$CROSS_LDFLAGS" ) ;;
       macos)   args+=( CFLAGS="-fwrapv $CROSS_CFLAGS" CXXFLAGS="-fwrapv $CROSS_CFLAGS"
@@ -544,7 +544,7 @@ build_shaderc() {
   local cflags="" exelink=""
   case "$PLATFORM" in
     bionic)  exelink="-static $BIONIC_EXE_LDFLAGS" ;;
-    linux)    exelink="$CROSS_LDFLAGS"; cflags="$CROSS_CFLAGS"
+    linux)    exelink="-s $CROSS_LDFLAGS"; cflags="-g0 $CROSS_CFLAGS"
              [ "$TARGET" = hexagon-linux-musl ] && cflags="-Wno-bitfield-width -Wno-error=bitfield-width $CROSS_CFLAGS" ;;
     bsd)     cflags="-Wno-error=date-time $CROSS_CFLAGS"; exelink="$CROSS_LDFLAGS" ;;
     macos)   cflags="-Wno-error=date-time $CROSS_CFLAGS"; exelink="$CROSS_LDFLAGS" ;;
@@ -557,7 +557,7 @@ build_shaderc() {
   # C files. Tests are off, so gtest/effcee/re2 never see them.
   cmake -S "$SH" -B "$SH/build" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$SH/install" \
-    -DCMAKE_BUILD_TYPE=MinSizeRel \
+    -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_FLAGS="$cflags" -DCMAKE_CXX_FLAGS="$cflags -fno-rtti -fno-exceptions" \
     -DCMAKE_EXE_LINKER_FLAGS="$exelink" -DCMAKE_SHARED_LINKER_FLAGS="$exelink" \
     -DCMAKE_CROSSCOMPILING=True -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
@@ -587,7 +587,7 @@ build_pydeps() {
   # bsd: the stdlib modules are shared objects there and link these archives
   # in, so they must be PIC ("relocation ... recompile with -fPIC" otherwise,
   # which silently drops zlib/_bz2/_lzma).
-  local dcf="-fno-sanitize=undefined"
+  local dcf="-fstack-clash-protection -fstack-protector-strong -fno-sanitize=undefined"
   case "$TARGET" in mips*) dcf="-fPIC $dcf" ;; esac
   [ "$PLATFORM" = bsd ] && case "$dcf" in -fPIC*) ;; *) dcf="-fPIC $dcf" ;; esac
 
@@ -595,7 +595,7 @@ build_pydeps() {
     ( cd "$BUILD"
       fetch_unpack https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz /tmp/zlib.tar.xz
       cd zlib-1.3.1
-      CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$dcf" \
+      CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="-O3 $dcf" \
         ./configure --prefix="$PYDEPS" --static
       make -j"$(ncpu)" install )
   fi
@@ -604,7 +604,7 @@ build_pydeps() {
     ( cd "$BUILD"
       fetch_unpack https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz /tmp/bzip2.tar.gz
       cd bzip2-1.0.8
-      make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$dcf" libbz2.a
+      make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="-O2 $dcf" libbz2.a
       cp -f libbz2.a "$PYDEPS/lib/"; cp -f bzlib.h "$PYDEPS/include/" )
   fi
 
@@ -623,7 +623,7 @@ build_pydeps() {
       ./configure --prefix="$PYDEPS" --build=x86_64-linux-gnu --host="$TARGET" \
         --disable-shared --enable-static --disable-xz --disable-xzdec --disable-lzmadec \
         --disable-lzmainfo --disable-lzma-links --disable-scripts --disable-doc --disable-nls \
-        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="$dcf" \
+        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-O2 $dcf" \
         "${rcargs[@]}"
       make -j"$(ncpu)" install )
   fi
@@ -690,7 +690,7 @@ build_pydeps() {
       fi
       ./configure --prefix="$PYDEPS" --build=x86_64-linux-gnu --host="$ffi_host" \
         --disable-shared --enable-static --disable-docs --disable-multi-os-directory \
-        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="$ffi_cf" \
+        CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-O2 $ffi_cf" \
         "${ffi_args[@]}"
       make -j"$(ncpu)" install
       # libffi installs its headers under lib/libffi-*/include on some layouts.
@@ -710,7 +710,7 @@ build_pydeps() {
           ./configure --prefix="$PYDEPS" --build=x86_64-linux-gnu --host="$TARGET" \
             --disable-shared --enable-static --disable-all-programs --enable-libuuid \
             --disable-nls --without-python --without-systemd --without-udev \
-            CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="$dcf"
+            CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" CFLAGS="-O2 $dcf"
           make -j"$(ncpu)" install ) \
         || log "libuuid did not build for $TARGET; _uuid will be absent"
       fi ;;
@@ -948,9 +948,9 @@ MODULE_BUILDTYPE=static
                       LD_LIBRARY_PATH="$TC/sysroot/usr/lib/$TARGET"
                       LDFLAGS="-L$PYDEPS/lib -static $ndk_vs $BIONIC_EXE_LDFLAGS"
                       $grpna $pwdna $testna ) ;;
-      linux)   args+=( CFLAGS="-Wno-error=date-time $CROSS_CFLAGS"
-                      CXXFLAGS="-Wno-error=date-time $CROSS_CFLAGS"
-                      LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS" ) ;;
+      linux)   args+=( CFLAGS="-Wno-error=date-time -g0 $CROSS_CFLAGS"
+                      CXXFLAGS="-Wno-error=date-time -g0 $CROSS_CFLAGS"
+                      LDFLAGS="-L$PYDEPS/lib -s $CROSS_LDFLAGS" ) ;;
       bsd)    # -fPIC: configure omits CCSHARED for the "unknown" platform tag,
               # so the shared stdlib .so fail to link (R_AARCH64_* "recompile
               # with -fPIC"); build everything PIC. OpenBSD: -D_BSD_SOURCE
