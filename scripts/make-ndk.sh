@@ -453,8 +453,8 @@ build_yasm() {
                  CC="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     case "$PLATFORM" in
       bionic)  args+=( LDFLAGS="-static $BIONIC_EXE_LDFLAGS" ) ;;
-      linux)    args+=( CFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
-                       CXXFLAGS="-fwrapv -Wno-error=date-time $CROSS_CFLAGS"
+      linux)    args+=( CFLAGS="-O2 -fwrapv -Wno-error=date-time $CROSS_CFLAGS"
+                       CXXFLAGS="-O2 -fwrapv -Wno-error=date-time $CROSS_CFLAGS"
                        LDFLAGS="-s $CROSS_LDFLAGS" ) ;;
       bsd)     args+=( CFLAGS="-fwrapv $CROSS_CFLAGS" CXXFLAGS="-fwrapv $CROSS_CFLAGS"
                        LDFLAGS="$CROSS_LDFLAGS" ) ;;
