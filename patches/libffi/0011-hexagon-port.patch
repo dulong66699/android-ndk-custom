@@ -1,0 +1,635 @@
+diff --git a/Makefile.am b/Makefile.am
+index 74f8725..44bd063 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -57,6 +57,7 @@ noinst_HEADERS = src/aarch64/ffitarget.h src/aarch64/internal.h		\
+ 	src/cris/ffitarget.h src/csky/ffitarget.h src/frv/ffitarget.h	\
+ 	src/ia64/ffitarget.h src/ia64/ia64_flags.h			\
+ 	src/m32r/ffitarget.h src/m68k/ffitarget.h			\
++	src/hexagon/ffitarget.h src/hexagon/internal.h		\
+ 	src/m88k/ffitarget.h src/metag/ffitarget.h			\
+ 	src/microblaze/ffitarget.h src/mips/ffitarget.h			\
+ 	src/moxie/ffitarget.h \
+@@ -93,6 +94,7 @@ EXTRA_libffi_la_SOURCES = src/aarch64/ffi.c src/aarch64/sysv.S		\
+ 	src/powerpc/ppc_closure.S src/powerpc/aix.S			\
+ 	src/powerpc/darwin.S src/powerpc/aix_closure.S			\
+ 	src/powerpc/darwin_closure.S src/powerpc/ffi_darwin.c		\
++	src/hexagon/ffi.c src/hexagon/sysv.S				\
+ 	src/riscv/ffi.c src/riscv/sysv.S src/s390/ffi.c			\
+ 	src/s390/sysv.S src/sh/ffi.c src/sh/sysv.S src/sh64/ffi.c	\
+ 	src/sh64/sysv.S src/sparc/ffi.c src/sparc/ffi64.c		\
+diff --git a/Makefile.in b/Makefile.in
+index c29cbb6..f47242c 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -210,6 +210,7 @@ am__depfiles_remade = src/$(DEPDIR)/closures.Plo \
+ 	src/cris/$(DEPDIR)/ffi.Plo src/cris/$(DEPDIR)/sysv.Plo \
+ 	src/csky/$(DEPDIR)/ffi.Plo src/csky/$(DEPDIR)/sysv.Plo \
+ 	src/frv/$(DEPDIR)/eabi.Plo src/frv/$(DEPDIR)/ffi.Plo \
++	src/hexagon/$(DEPDIR)/ffi.Plo src/hexagon/$(DEPDIR)/sysv.Plo \
+ 	src/ia64/$(DEPDIR)/ffi.Plo src/ia64/$(DEPDIR)/unix.Plo \
+ 	src/kvx/$(DEPDIR)/ffi.Plo src/kvx/$(DEPDIR)/sysv.Plo \
+ 	src/loongarch/$(DEPDIR)/ffi.Plo \
+@@ -329,8 +330,8 @@ am__define_uniq_tagged_files = \
+   done | $(am__uniquify_input)`
+ DIST_SUBDIRS = include testsuite man doc
+ am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/fficonfig.h.in \
+-	$(srcdir)/libffi.pc.in README.md compile config.guess \
+-	config.sub depcomp install-sh ltmain.sh missing
++	$(srcdir)/libffi.pc.in ChangeLog README.md compile \
++	config.guess config.sub depcomp install-sh ltmain.sh missing
+ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+ distdir = $(PACKAGE)-$(VERSION)
+ top_distdir = $(distdir)
+@@ -561,6 +562,7 @@ noinst_HEADERS = src/aarch64/ffitarget.h src/aarch64/internal.h		\
+ 	src/cris/ffitarget.h src/csky/ffitarget.h src/frv/ffitarget.h	\
+ 	src/ia64/ffitarget.h src/ia64/ia64_flags.h			\
+ 	src/m32r/ffitarget.h src/m68k/ffitarget.h			\
++	src/hexagon/ffitarget.h src/hexagon/internal.h		\
+ 	src/m88k/ffitarget.h src/metag/ffitarget.h			\
+ 	src/microblaze/ffitarget.h src/mips/ffitarget.h			\
+ 	src/moxie/ffitarget.h \
+@@ -597,6 +599,7 @@ EXTRA_libffi_la_SOURCES = src/aarch64/ffi.c src/aarch64/sysv.S		\
+ 	src/powerpc/ppc_closure.S src/powerpc/aix.S			\
+ 	src/powerpc/darwin.S src/powerpc/aix_closure.S			\
+ 	src/powerpc/darwin_closure.S src/powerpc/ffi_darwin.c		\
++	src/hexagon/ffi.c src/hexagon/sysv.S				\
+ 	src/riscv/ffi.c src/riscv/sysv.S src/s390/ffi.c			\
+ 	src/s390/sysv.S src/sh/ffi.c src/sh/sysv.S src/sh64/ffi.c	\
+ 	src/sh64/sysv.S src/sparc/ffi.c src/sparc/ffi64.c		\
+@@ -970,6 +973,16 @@ src/powerpc/darwin_closure.lo: src/powerpc/$(am__dirstamp) \
+ 	src/powerpc/$(DEPDIR)/$(am__dirstamp)
+ src/powerpc/ffi_darwin.lo: src/powerpc/$(am__dirstamp) \
+ 	src/powerpc/$(DEPDIR)/$(am__dirstamp)
++src/hexagon/$(am__dirstamp):
++	@$(MKDIR_P) src/hexagon
++	@: > src/hexagon/$(am__dirstamp)
++src/hexagon/$(DEPDIR)/$(am__dirstamp):
++	@$(MKDIR_P) src/hexagon/$(DEPDIR)
++	@: > src/hexagon/$(DEPDIR)/$(am__dirstamp)
++src/hexagon/ffi.lo: src/hexagon/$(am__dirstamp) \
++	src/hexagon/$(DEPDIR)/$(am__dirstamp)
++src/hexagon/sysv.lo: src/hexagon/$(am__dirstamp) \
++	src/hexagon/$(DEPDIR)/$(am__dirstamp)
+ src/riscv/$(am__dirstamp):
+ 	@$(MKDIR_P) src/riscv
+ 	@: > src/riscv/$(am__dirstamp)
+@@ -1132,6 +1145,8 @@ mostlyclean-compile:
+ 	-rm -f src/csky/*.lo
+ 	-rm -f src/frv/*.$(OBJEXT)
+ 	-rm -f src/frv/*.lo
++	-rm -f src/hexagon/*.$(OBJEXT)
++	-rm -f src/hexagon/*.lo
+ 	-rm -f src/ia64/*.$(OBJEXT)
+ 	-rm -f src/ia64/*.lo
+ 	-rm -f src/kvx/*.$(OBJEXT)
+@@ -1209,6 +1224,8 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@src/csky/$(DEPDIR)/sysv.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@src/frv/$(DEPDIR)/eabi.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@src/frv/$(DEPDIR)/ffi.Plo@am__quote@ # am--include-marker
++@AMDEP_TRUE@@am__include@ @am__quote@src/hexagon/$(DEPDIR)/ffi.Plo@am__quote@ # am--include-marker
++@AMDEP_TRUE@@am__include@ @am__quote@src/hexagon/$(DEPDIR)/sysv.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@src/ia64/$(DEPDIR)/ffi.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@src/ia64/$(DEPDIR)/unix.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@src/kvx/$(DEPDIR)/ffi.Plo@am__quote@ # am--include-marker
+@@ -1345,6 +1362,7 @@ clean-libtool:
+ 	-rm -rf src/cris/.libs src/cris/_libs
+ 	-rm -rf src/csky/.libs src/csky/_libs
+ 	-rm -rf src/frv/.libs src/frv/_libs
++	-rm -rf src/hexagon/.libs src/hexagon/_libs
+ 	-rm -rf src/ia64/.libs src/ia64/_libs
+ 	-rm -rf src/kvx/.libs src/kvx/_libs
+ 	-rm -rf src/loongarch/.libs src/loongarch/_libs
+@@ -1752,6 +1770,8 @@ distclean-generic:
+ 	-rm -f src/csky/$(am__dirstamp)
+ 	-rm -f src/frv/$(DEPDIR)/$(am__dirstamp)
+ 	-rm -f src/frv/$(am__dirstamp)
++	-rm -f src/hexagon/$(DEPDIR)/$(am__dirstamp)
++	-rm -f src/hexagon/$(am__dirstamp)
+ 	-rm -f src/ia64/$(DEPDIR)/$(am__dirstamp)
+ 	-rm -f src/ia64/$(am__dirstamp)
+ 	-rm -f src/kvx/$(DEPDIR)/$(am__dirstamp)
+@@ -1837,6 +1857,8 @@ distclean: distclean-recursive
+ 	-rm -f src/csky/$(DEPDIR)/sysv.Plo
+ 	-rm -f src/frv/$(DEPDIR)/eabi.Plo
+ 	-rm -f src/frv/$(DEPDIR)/ffi.Plo
++	-rm -f src/hexagon/$(DEPDIR)/ffi.Plo
++	-rm -f src/hexagon/$(DEPDIR)/sysv.Plo
+ 	-rm -f src/ia64/$(DEPDIR)/ffi.Plo
+ 	-rm -f src/ia64/$(DEPDIR)/unix.Plo
+ 	-rm -f src/kvx/$(DEPDIR)/ffi.Plo
+@@ -1977,6 +1999,8 @@ maintainer-clean: maintainer-clean-recursive
+ 	-rm -f src/csky/$(DEPDIR)/sysv.Plo
+ 	-rm -f src/frv/$(DEPDIR)/eabi.Plo
+ 	-rm -f src/frv/$(DEPDIR)/ffi.Plo
++	-rm -f src/hexagon/$(DEPDIR)/ffi.Plo
++	-rm -f src/hexagon/$(DEPDIR)/sysv.Plo
+ 	-rm -f src/ia64/$(DEPDIR)/ffi.Plo
+ 	-rm -f src/ia64/$(DEPDIR)/unix.Plo
+ 	-rm -f src/kvx/$(DEPDIR)/ffi.Plo
+diff --git a/configure.host b/configure.host
+index 59403c3..455dc4e 100644
+--- a/configure.host
++++ b/configure.host
+@@ -42,6 +42,11 @@ case "${host}" in
+ 	SOURCES="ffi.c sysv.S"
+ 	;;
+ 
++  hexagon-*-*)
++	TARGET=HEXAGON; TARGETDIR=hexagon
++	SOURCES="ffi.c sysv.S"
++	;;
++
+   avr32*-*-*)
+ 	TARGET=AVR32; TARGETDIR=avr32
+ 	SOURCES="ffi.c sysv.S"
+diff --git a/src/hexagon/ffi.c b/src/hexagon/ffi.c
+new file mode 100644
+index 0000000..7ae0474
+--- /dev/null
++++ b/src/hexagon/ffi.c
+@@ -0,0 +1,299 @@
++/* -----------------------------------------------------------------------
++   ffi.c - Hexagon Foreign Function Interface
++
++   Permission is hereby granted, free of charge, to any person obtaining
++   a copy of this software and associated documentation files (the
++   ``Software''), to deal in the Software without restriction, including
++   without limitation the rights to use, copy, modify, merge, publish,
++   distribute, sublicense, and/or sell copies of the Software, and to
++   permit persons to whom the Software is furnished to do so, subject to
++   the following conditions:
++
++   The above copyright notice and this permission notice shall be included
++   in all copies or substantial portions of the Software.
++
++   THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
++   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++   NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++   DEALINGS IN THE SOFTWARE.
++   ----------------------------------------------------------------------- */
++
++#include <ffi.h>
++#include <ffi_common.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include "internal.h"
++
++/* This follows clang's lowering (clang/lib/CodeGen/Targets/Hexagon.cpp)
++   and LLVM's CC_Hexagon, musl flavour:
++
++   - Scalars take r0-r5 in order.  A 64-bit one (long long, double) takes
++     the next even pair, skipping an odd register; once none is left it
++     goes on the stack, and so does everything after it.
++   - Structs of up to 8 bytes are passed as a 32- or 64-bit integer when
++     clang's own count of free registers says they fit, or when they are
++     no larger than their alignment; otherwise, like every larger struct,
++     they are copied onto the stack in a slot of at least 8 bytes.  Clang's
++     count starts at six and ignores the struct-return pointer, which LLVM
++     passes in r0.
++   - Returns come back in r0 or r1:0; structs larger than 8 bytes are
++     returned in memory whose address is passed in r0.
++   - Variadic arguments follow the same rules.  */
++
++struct arg_state
++{
++  unsigned ngrn;	/* next register LLVM allocates */
++  unsigned regs_left;	/* clang's count of free registers */
++  size_t nsaa;		/* next stack offset */
++};
++
++/* clang's HexagonAdjustRegsLeft.  */
++static int
++adjust_regs_left (struct arg_state *st, size_t size)
++{
++  if (st->regs_left == 0)
++    return 0;
++  if (size <= 4)
++    {
++      st->regs_left--;
++      return 1;
++    }
++  if (2 <= (st->regs_left & ~1U))
++    {
++      st->regs_left = (st->regs_left & ~1U) - 2;
++      return 1;
++    }
++  if (st->regs_left == 1)
++    st->regs_left = 0;
++  return 0;
++}
++
++static int
++place_int (struct arg_state *st, size_t size, size_t *off)
++{
++  if (size > 4)
++    {
++      st->ngrn = FFI_ALIGN (st->ngrn, 2);
++      if (st->ngrn + 2 <= HEXAGON_NARGREG)
++	{
++	  st->ngrn += 2;
++	  return st->ngrn - 2;
++	}
++      st->ngrn = HEXAGON_NARGREG;
++      st->nsaa = FFI_ALIGN (st->nsaa, 8);
++      *off = st->nsaa;
++      st->nsaa += 8;
++      return -1;
++    }
++  if (st->ngrn < HEXAGON_NARGREG)
++    return st->ngrn++;
++  st->nsaa = FFI_ALIGN (st->nsaa, 4);
++  *off = st->nsaa;
++  st->nsaa += 4;
++  return -1;
++}
++
++/* Returns the first register of ARG, or -1 when it is passed on the stack
++   at offset *OFF.  */
++static int
++place_arg (ffi_type *arg, struct arg_state *st, size_t *off)
++{
++  size_t z = arg->size;
++
++  if (arg->type == FFI_TYPE_STRUCT || arg->type == FFI_TYPE_COMPLEX)
++    {
++      if (z <= 8)
++	{
++	  size_t align = adjust_regs_left (st, z) ? (z <= 4 ? 4 : 8)
++						   : arg->alignment;
++	  if (z <= align)
++	    return place_int (st, z, off);
++	}
++      st->nsaa = FFI_ALIGN (st->nsaa, arg->alignment);
++      *off = st->nsaa;
++      st->nsaa += z < 8 ? 8 : z;
++      return -1;
++    }
++
++  adjust_regs_left (st, z);
++  return place_int (st, z, off);
++}
++
++ffi_status FFI_HIDDEN
++ffi_prep_cif_machdep (ffi_cif *cif)
++{
++  struct arg_state st = { 0, HEXAGON_NARGREG, 0 };
++  unsigned i;
++  size_t off;
++
++  if (cif->rtype->type == FFI_TYPE_VOID)
++    cif->flags = HEXAGON_RET_VOID;
++  else if ((cif->rtype->type == FFI_TYPE_STRUCT
++	    || cif->rtype->type == FFI_TYPE_COMPLEX)
++	   && cif->rtype->size > 8)
++    {
++      cif->flags = HEXAGON_RET_SRET;
++      st.ngrn = 1;
++    }
++  else
++    cif->flags = HEXAGON_RET_VALUE;
++
++  for (i = 0; i < cif->nargs; i++)
++    place_arg (cif->arg_types[i], &st, &off);
++
++  cif->bytes = FFI_ALIGN (st.nsaa, 8);
++  return FFI_OK;
++}
++
++/* Stores VALUE of type T at DEST, widening sub-word integers to a word.  */
++static void
++put_arg (ffi_type *t, void *value, void *dest)
++{
++  switch (t->type)
++    {
++    case FFI_TYPE_SINT8:
++      *(SINT32 *) dest = *(SINT8 *) value;
++      break;
++    case FFI_TYPE_UINT8:
++      *(UINT32 *) dest = *(UINT8 *) value;
++      break;
++    case FFI_TYPE_SINT16:
++      *(SINT32 *) dest = *(SINT16 *) value;
++      break;
++    case FFI_TYPE_UINT16:
++      *(UINT32 *) dest = *(UINT16 *) value;
++      break;
++    default:
++      memcpy (dest, value, t->size);
++      break;
++    }
++}
++
++extern void ffi_call_hexagon (UINT64 *regs, void *stack, size_t bytes,
++			      void (*fn) (void), UINT64 *ret) FFI_HIDDEN;
++
++void
++ffi_call (ffi_cif *cif, void (*fn) (void), void *rvalue, void **avalue)
++{
++  UINT64 regs[HEXAGON_NARGREG / 2] = { 0 };
++  UINT64 ret = 0;
++  char *stack = alloca (cif->bytes);
++  struct arg_state st = { 0, HEXAGON_NARGREG, 0 };
++  unsigned i;
++  size_t off;
++
++  if (cif->flags == HEXAGON_RET_SRET)
++    {
++      if (rvalue == NULL)
++	rvalue = alloca (cif->rtype->size);
++      ((UINT32 *) regs)[st.ngrn++] = (UINT32) (uintptr_t) rvalue;
++    }
++
++  for (i = 0; i < cif->nargs; i++)
++    {
++      ffi_type *t = cif->arg_types[i];
++      int r = place_arg (t, &st, &off);
++      put_arg (t, avalue[i], r >= 0 ? (char *) regs + r * 4 : stack + off);
++    }
++
++  ffi_call_hexagon (regs, stack, cif->bytes, fn, &ret);
++
++  if (cif->flags != HEXAGON_RET_VALUE || rvalue == NULL)
++    return;
++  switch (cif->rtype->type)
++    {
++    case FFI_TYPE_SINT8:
++      *(ffi_sarg *) rvalue = (SINT8) ret;
++      break;
++    case FFI_TYPE_UINT8:
++      *(ffi_arg *) rvalue = (UINT8) ret;
++      break;
++    case FFI_TYPE_SINT16:
++      *(ffi_sarg *) rvalue = (SINT16) ret;
++      break;
++    case FFI_TYPE_UINT16:
++      *(ffi_arg *) rvalue = (UINT16) ret;
++      break;
++    default:
++      memcpy (rvalue, &ret, cif->rtype->size);
++      break;
++    }
++}
++
++#if FFI_CLOSURES
++
++extern const char ffi_hexagon_trampoline[] FFI_HIDDEN;
++extern void ffi_closure_hexagon (void) FFI_HIDDEN;
++
++static void
++flush_icache (char *start, size_t size)
++{
++  uintptr_t p, end = (uintptr_t) start + size;
++
++  for (p = (uintptr_t) start & ~(uintptr_t) 31; p < end; p += 32)
++    __asm__ volatile ("dccleana(%0)" : : "r" (p) : "memory");
++  for (p = (uintptr_t) start & ~(uintptr_t) 31; p < end; p += 32)
++    __asm__ volatile ("icinva(%0)" : : "r" (p) : "memory");
++  __asm__ volatile ("isync" : : : "memory");
++}
++
++ffi_status
++ffi_prep_closure_loc (ffi_closure *closure, ffi_cif *cif,
++		      void (*fun) (ffi_cif *, void *, void **, void *),
++		      void *user_data, void *codeloc)
++{
++  char *tramp = closure->tramp;
++
++  if (cif->abi != FFI_SYSV)
++    return FFI_BAD_ABI;
++
++  memcpy (tramp, ffi_hexagon_trampoline, 16);
++  ((void **) tramp)[4] = closure;
++  ((void **) tramp)[5] = (void *) ffi_closure_hexagon;
++
++  closure->cif = cif;
++  closure->fun = fun;
++  closure->user_data = user_data;
++
++  flush_icache (codeloc, FFI_TRAMPOLINE_SIZE);
++  return FFI_OK;
++}
++
++/* Called from ffi_closure_hexagon with the argument registers saved in
++   REGS, the caller's stack arguments at STACK, and RET to be loaded into
++   r1:0 on return.  */
++void FFI_HIDDEN
++ffi_closure_hexagon_inner (ffi_closure *closure, UINT32 *regs, char *stack,
++			   UINT64 *ret)
++{
++  ffi_cif *cif = closure->cif;
++  void **avalue = alloca (cif->nargs * sizeof (void *));
++  void *rvalue = ret;
++  struct arg_state st = { 0, HEXAGON_NARGREG, 0 };
++  unsigned i;
++  size_t off;
++
++  if (cif->flags == HEXAGON_RET_SRET)
++    {
++      rvalue = (void *) (uintptr_t) regs[0];
++      st.ngrn = 1;
++    }
++
++  for (i = 0; i < cif->nargs; i++)
++    {
++      int r = place_arg (cif->arg_types[i], &st, &off);
++      avalue[i] = r >= 0 ? (void *) &regs[r] : (void *) (stack + off);
++    }
++
++  closure->fun (cif, rvalue, avalue, closure->user_data);
++
++  if (cif->flags == HEXAGON_RET_SRET)
++    *(UINT32 *) ret = (UINT32) (uintptr_t) rvalue;
++}
++
++#endif
+diff --git a/src/hexagon/ffitarget.h b/src/hexagon/ffitarget.h
+new file mode 100644
+index 0000000..7c9e88f
+--- /dev/null
++++ b/src/hexagon/ffitarget.h
+@@ -0,0 +1,49 @@
++/* -----------------------------------------------------------------*-C-*-
++   ffitarget.h - Target configuration macros for Hexagon.
++
++   Permission is hereby granted, free of charge, to any person obtaining
++   a copy of this software and associated documentation files (the
++   ``Software''), to deal in the Software without restriction, including
++   without limitation the rights to use, copy, modify, merge, publish,
++   distribute, sublicense, and/or sell copies of the Software, and to
++   permit persons to whom the Software is furnished to do so, subject to
++   the following conditions:
++
++   The above copyright notice and this permission notice shall be included
++   in all copies or substantial portions of the Software.
++
++   THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
++   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++   NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++   DEALINGS IN THE SOFTWARE.
++   ----------------------------------------------------------------------- */
++
++#ifndef LIBFFI_TARGET_H
++#define LIBFFI_TARGET_H
++
++#ifndef LIBFFI_H
++#error "Please do not include ffitarget.h directly into your source.  Use ffi.h instead."
++#endif
++
++#ifndef LIBFFI_ASM
++typedef unsigned long ffi_arg;
++typedef signed long ffi_sarg;
++
++typedef enum ffi_abi {
++  FFI_FIRST_ABI = 0,
++  FFI_SYSV,
++  FFI_LAST_ABI,
++  FFI_DEFAULT_ABI = FFI_SYSV
++} ffi_abi;
++#endif
++
++#define FFI_CLOSURES 1
++/* 16 bytes of code followed by the closure and entry point addresses.  */
++#define FFI_TRAMPOLINE_SIZE 24
++#define FFI_NATIVE_RAW_API 0
++
++#endif
+diff --git a/src/hexagon/internal.h b/src/hexagon/internal.h
+new file mode 100644
+index 0000000..05e71fe
+--- /dev/null
++++ b/src/hexagon/internal.h
+@@ -0,0 +1,6 @@
++/* cif->flags */
++#define HEXAGON_RET_VALUE 0	/* in r0 or r1:0 */
++#define HEXAGON_RET_VOID 1
++#define HEXAGON_RET_SRET 2	/* in memory; its address is passed in r0 */
++
++#define HEXAGON_NARGREG 6	/* r0-r5 */
+diff --git a/src/hexagon/sysv.S b/src/hexagon/sysv.S
+new file mode 100644
+index 0000000..d842224
+--- /dev/null
++++ b/src/hexagon/sysv.S
+@@ -0,0 +1,112 @@
++/* -----------------------------------------------------------------------
++   sysv.S - Hexagon Foreign Function Interface
++
++   Permission is hereby granted, free of charge, to any person obtaining
++   a copy of this software and associated documentation files (the
++   ``Software''), to deal in the Software without restriction, including
++   without limitation the rights to use, copy, modify, merge, publish,
++   distribute, sublicense, and/or sell copies of the Software, and to
++   permit persons to whom the Software is furnished to do so, subject to
++   the following conditions:
++
++   The above copyright notice and this permission notice shall be included
++   in all copies or substantial portions of the Software.
++
++   THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
++   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++   NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++   DEALINGS IN THE SOFTWARE.
++   ----------------------------------------------------------------------- */
++
++#define LIBFFI_ASM
++#include <fficonfig.h>
++#include <ffi.h>
++
++	.text
++
++/* void ffi_call_hexagon (UINT64 *regs, void *stack, size_t bytes,
++			  void (*fn) (void), UINT64 *ret)
++
++   BYTES is a multiple of 8.  */
++	.p2align 4
++	.globl	ffi_call_hexagon
++	.hidden	ffi_call_hexagon
++	.type	ffi_call_hexagon, @function
++ffi_call_hexagon:
++	.cfi_startproc
++	{ allocframe(#8) }
++	.cfi_def_cfa r30, 8
++	.cfi_offset r31, -4
++	.cfi_offset r30, -8
++	{ memd(r29+#0) = r17:16 }
++	.cfi_offset r16, -16
++	.cfi_offset r17, -12
++	{ r16 = r4
++	  r17 = r0 }
++	{ r29 = sub(r29,r2)
++	  r6 = lsr(r2,#2) }
++	{ r5 = r29
++	  p0 = cmp.eq(r6,#0)
++	  if (p0.new) jump:nt 2f }
++1:	{ r7 = memw(r1++#4) }
++	{ memw(r5++#4) = r7
++	  r6 = add(r6,#-1) }
++	{ p0 = cmp.eq(r6,#0)
++	  if (!p0.new) jump:t 1b }
++2:	{ r28 = r3 }
++	{ r1:0 = memd(r17+#0) }
++	{ r3:2 = memd(r17+#8) }
++	{ r5:4 = memd(r17+#16) }
++	{ callr r28 }
++	{ memd(r16+#0) = r1:0 }
++	{ r17:16 = memd(r30+#-8) }
++	{ dealloc_return }
++	.cfi_endproc
++	.size	ffi_call_hexagon, .-ffi_call_hexagon
++
++#if FFI_CLOSURES
++/* Copied into each closure: loads the closure and the entry point stored
++   right after these 16 bytes, closure in r28.  */
++	.p2align 2
++	.globl	ffi_hexagon_trampoline
++	.hidden	ffi_hexagon_trampoline
++	.type	ffi_hexagon_trampoline, @object
++ffi_hexagon_trampoline:
++	{ r28 = add(pc,#16) }
++	{ r6 = memw(r28+#4)
++	  r28 = memw(r28+#0) }
++	{ jumpr r6 }
++	.size	ffi_hexagon_trampoline, .-ffi_hexagon_trampoline
++
++/* Entered from a trampoline with the closure in r28.  */
++	.p2align 4
++	.globl	ffi_closure_hexagon
++	.hidden	ffi_closure_hexagon
++	.type	ffi_closure_hexagon, @function
++ffi_closure_hexagon:
++	.cfi_startproc
++	{ allocframe(#32) }
++	.cfi_def_cfa r30, 8
++	.cfi_offset r31, -4
++	.cfi_offset r30, -8
++	{ memd(r29+#0) = r1:0 }
++	{ memd(r29+#8) = r3:2 }
++	{ memd(r29+#16) = r5:4 }
++	{ r0 = r28
++	  r1 = r29
++	  r2 = add(r30,#8)
++	  r3 = add(r29,#24) }
++	{ call ffi_closure_hexagon_inner }
++	{ r1:0 = memd(r29+#24) }
++	{ dealloc_return }
++	.cfi_endproc
++	.size	ffi_closure_hexagon, .-ffi_closure_hexagon
++#endif
++
++#if defined __ELF__ && defined __linux__
++	.section	.note.GNU-stack,"",@progbits
++#endif

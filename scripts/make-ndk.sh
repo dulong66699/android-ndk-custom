@@ -656,8 +656,6 @@ build_pydeps() {
       *-none) ffi_os="$(echo "$TARGET" | cut -d- -f2)"; ffi_host="$ffi_cpu-unknown-$ffi_os" ;;
       *)      ffi_host="$ffi_cpu-${TARGET#*-}" ;;
     esac
-    # libffi has no hexagon port; that target ships without _ctypes rather
-    # than failing the whole NDK.
     local ffi_cf="$dcf" ffi_args=()
     # zig (linux/bsd): the wrapper adds -c to configure's `cc -Werror -S`
     # hidden-visibility probe, which then fails, so the assembly exports its
