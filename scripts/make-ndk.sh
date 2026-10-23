@@ -529,6 +529,7 @@ build_shaderc() {
     -e 's/^import distutils\.dir_util$/import os/' \
     -e 's/distutils\.dir_util\.mkpath(\(.*\))$/os.makedirs(\1, exist_ok=True)/' \
     -e "s/mode='rU'/mode='r'/"
+  sed -i '/void setAllocator(TPoolAllocator\* a) { allocator = \*a; }/d' "$SH/third_party/glslang/glslang/Include/PoolAlloc.h"
   # big-endian hosts: glslc writes the SPIR-V words in host byte order, but
   # .spv files are little-endian (Android/Vulkan load them as LE words, and
   # official glslc only runs on LE hosts). Byte-swap binary output there.
