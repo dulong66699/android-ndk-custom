@@ -1030,13 +1030,6 @@ build_python2() {
     if [ ! -x "$BUILD/python2-host/bin/python2.7" ]; then
       rm -rf python2-native; cp -a python2-src python2-native
       ( cd python2-native
-        # Built-in stdlib modules: make install runs this interpreter with the
-        # target's build directory on PYTHONPATH, whose _struct.so & co. it
-        # would otherwise try to load.
-        { echo '*static*'
-          sed -nE 's/^#((array|cmath|math|_struct|time|operator|_random|_collections|_heapq|itertools|strop|_functools|datetime|_bisect|_io|fcntl|select|binascii|cStringIO|cPickle|_md5|_sha|_sha256|_sha512)[[:space:]].*)$/\1/p' Modules/Setup.dist
-        } > Modules/Setup.local
-        sed -i '/^cmath /s/ _math\.c//' Modules/Setup.local
         CC=/usr/bin/cc ./configure --prefix="$BUILD/python2-host" --without-ensurepip
         make -j"$(ncpu)" && make install ) > "$BUILD/python2-host.log" 2>&1 \
         || { tail -40 "$BUILD/python2-host.log" >&2; exit 1; }
@@ -1154,7 +1147,16 @@ build_python2() {
     ./configure "${args[@]}"
     make -j"$(ncpu)" 2>&1 | tee build_all.log
     [ "${PIPESTATUS[0]}" = 0 ] || exit 1
-    make install
+    if [ "$PLATFORM" = windows ]; then
+      make install
+    else
+      # make install runs the build machine's python2 with the target's build
+      # directory on PYTHONPATH; give it only that directory's sysconfig data,
+      # not the target's extension modules.
+      mkdir -p sysconfigdata
+      cp "$(cat pybuilddir.txt)/_sysconfigdata.py" sysconfigdata/
+      make install PYTHON_FOR_BUILD='_PYTHON_PROJECT_BASE=$(abs_builddir) _PYTHON_HOST_PLATFORM=$(_PYTHON_HOST_PLATFORM) PYTHONPATH=$(abs_builddir)/sysconfigdata:$(srcdir)/Lib:$(srcdir)/Lib/$(PLATDIR) python2.7'
+    fi
   )
 }
 
