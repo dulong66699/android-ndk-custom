@@ -180,6 +180,11 @@ strip_debugger() {
   rm -f "$NDK_TOOLCHAIN/bin"/*lldb*
   rm -rf "$NDK/python-packages"
   find "$NDK_TOOLCHAIN/lib" -name 'lldb-server' -delete 2>/dev/null || true
+  # r20..r23: GDB (host gdb + per-ABI gdbserver) and the RenderScript
+  # toolchain, both official-only prebuilts.
+  rm -f "$PREBUILT_BIN"/gdb "$PREBUILT_BIN"/gdb.exe "$PREBUILT_BIN"/gdb-orig "$PREBUILT_BIN"/gdb-orig.exe
+  rm -rf "$PREBUILT_BIN/../share/gdb" "$NDK"/prebuilt/android-*
+  rm -rf "$NDK/toolchains/renderscript"
 }
 
 # --- download the official NDK(s) ------------------------------------------
