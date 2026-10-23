@@ -1083,6 +1083,8 @@ build_python2() {
                        CFLAGS="-O2 -fwrapv -D__USE_MINGW_ANSI_STDIO=1 -Wno-incompatible-function-pointer-types -Wno-incompatible-pointer-types -Wno-int-conversion -Wno-error=implicit-function-declaration"
                        LDFLAGS="-L$PYDEPS/lib -static-libgcc$laa"
                        WINDRES="$TC/bin/${TARGET}-windres" ) ;;
+      linux)   args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $CROSS_CFLAGS"
+                       LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS" ) ;;
     esac
     ./configure "${args[@]}"
     make -j"$(ncpu)" 2>&1 | tee build_all.log
