@@ -1166,16 +1166,33 @@ strip_deps() {
   if [ "$PLATFORM" = windows ]; then
     files=( "$BUILD/make/build/bin/make.exe"
             "$BUILD/yasm/build/bin/yasm.exe" "$BUILD/yasm/build/bin/ytasm.exe" "$BUILD/yasm/build/bin/vsyasm.exe"
-            "$BUILD/python/build/bin/python3.11.exe" "$BUILD/python/build/bin/libpython3.11.dll" )
+            "$BUILD/python/build/bin/python3.11.exe" "$BUILD/python/build/bin/libpython3.11.dll"
+            "$BUILD/python2/build/bin/python2.7.exe" "$BUILD/python2/build/bin/libpython2.7.dll" )
   else
     files=( "$BUILD/make/build/bin/make"
             "$BUILD/yasm/build/bin/yasm" "$BUILD/yasm/build/bin/ytasm" "$BUILD/yasm/build/bin/vsyasm"
-             "$BUILD/python/build/bin/python3.11" )
+             "$BUILD/python/build/bin/python3.11" "$BUILD/python2/build/bin/python2.7" )
   fi
   for f in "${files[@]}"; do
     [ -f "$f" ] || continue
     if [ "$PLATFORM" = bionic ]; then "$CROSS_STRIP" -s "$f"; else "$CROSS_STRIP" "$f"; fi
   done
+}
+
+# python2 (r24 and older): bin/python{,2,2.7} and lib/python2.7 in prebuilt/<host>,
+# where the official NDK has them, without the test suites and test modules.
+install_python2() {
+  local b="$BUILD/python2/build" lib="$PREBUILT_BIN/../lib" exe="" n
+  [ -d "$b/lib/python2.7" ] || return 0
+  [ "$PLATFORM" = windows ] && exe=.exe
+  for n in python python2 python2.7; do cp "$b/bin/python2.7$exe" "$PREBUILT_BIN/$n$exe"; done
+  [ "$PLATFORM" = windows ] && cp "$b/bin/libpython2.7.dll" "$PREBUILT_BIN/"
+  rm -rf "$lib/python2.7"; mkdir -p "$lib"
+  cp -R "$b/lib/python2.7" "$lib/"
+  rm -rf "$lib/python2.7"/{test,config,bsddb/test,ctypes/test,distutils/tests,email/test,json/tests,lib-tk/test,lib2to3/tests,sqlite3/test,unittest/test}
+  rm -f "$lib/python2.7/lib-dynload"/_ctypes_test.* "$lib/python2.7/lib-dynload"/_testcapi.*
+  find "$lib/python2.7" -name '*.py[co]' -delete
+  find "$lib/python2.7/lib-dynload" \( -name '*.so' -o -name '*.pyd' \) -exec "$CROSS_STRIP" {} \;
 }
 
 # --- download the matching llvm-custom toolchain ----------------------------
@@ -1248,6 +1265,7 @@ assemble_unix() {
   cp "$BUILD/yasm/build/bin/yasm" "$NDK_TOOLCHAIN/bin"
   cp "$BUILD/yasm/build/bin/ytasm" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/vsyasm" "$PREBUILT_BIN"
+  install_python2
   mkdir -p "$NDK_TOOLCHAIN/python3/bin" "$NDK_TOOLCHAIN/python3/lib"
   cp "$BUILD/python/build/bin/python3.11" "$NDK_TOOLCHAIN/python3/bin/python3"
   cp -R "$BUILD/python/build/lib/python3.11" "$NDK_TOOLCHAIN/python3/lib"
@@ -1601,6 +1619,7 @@ HOST_ARCH=x86_64' "$NDK/build/tools/ndk_bin_common.sh"
   cp "$BUILD/yasm/build/bin/ytasm.exe" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/vsyasm.exe" "$PREBUILT_BIN"
   build_toolbox "$PREBUILT_BIN"
+  install_python2
   # python3: python.exe at the python3/ root (ndk-build's Windows layout);
   # libpython3.11.dll and the winpthread runtime ride next to it.
   mkdir -p "$NDK_TOOLCHAIN/python3/lib"
@@ -1644,6 +1663,7 @@ build_yasm
 build_shaderc
 build_pydeps
 build_python
+build_python2
 strip_deps
 fetch_llvm
 assemble_ndk
