@@ -1054,11 +1054,12 @@ build_python2() {
       # Lib/plat-win32 regen reads ${MINGW_PREFIX}/include/stddef.h
       export MINGW_PREFIX="$TC/generic-w64-mingw32"
     fi
-    # Our own fixes: patches/<platform>/python2/*.patch, and on windows
+    # Our own fixes: patches/common/python2/*.patch, then
+    # patches/<platform>/python2/*.patch, and on windows
     # patches/windows/python2/custom/ on top of msys2's set. 2.7.18 is final,
     # so these are plain patches rather than guarded seds.
     local pdir="$ROOT/patches/$PLATFORM/python2"; [ "$PLATFORM" = windows ] && pdir="$pdir/custom"
-    for p in "$pdir"/*.patch; do
+    for p in "$ROOT"/patches/common/python2/*.patch "$pdir"/*.patch; do
       [ -f "$p" ] || continue
       patch -Np1 -i "$p" >/dev/null || { echo "python2: $(basename "$p") did not apply" >&2; exit 1; }
     done
@@ -1129,6 +1130,7 @@ build_python2() {
                local obsd=""; [ "$SYSTEM_NAME" = OpenBSD ] && obsd="-D_BSD_SOURCE"
                args+=( CFLAGS="-fPIC -fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $obsd $CROSS_CFLAGS"
                        LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS"
+                       LDSHARED="$CROSS_CC -shared"
                        LINKFORSHARED="-Wl,--export-dynamic" ) ;;
       macos)   # as for python3: modules resolve Python symbols at dlopen().
                args+=( CFLAGS="-D_DARWIN_C_SOURCE -fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $CROSS_CFLAGS"

@@ -1,0 +1,25 @@
+FFI_STDCALL exists only in libffi's 32-bit x86 backend; 32-bit ARM Windows
+has no stdcall.
+
+--- a/Modules/_ctypes/callbacks.c
++++ b/Modules/_ctypes/callbacks.c
+@@ -460,7 +460,7 @@
+     }
+ 
+     cc = FFI_DEFAULT_ABI;
+-#if defined(MS_WIN32) && !defined(_WIN32_WCE) && !defined(MS_WIN64)
++#if defined(MS_WIN32) && !defined(_WIN32_WCE) && !defined(MS_WIN64) && (defined(__i386__) || defined(_M_IX86))
+     if ((flags & FUNCFLAG_CDECL) == 0)
+         cc = FFI_STDCALL;
+ #endif
+--- a/Modules/_ctypes/callproc.c
++++ b/Modules/_ctypes/callproc.c
+@@ -797,7 +797,7 @@
+     }
+ 
+     cc = FFI_DEFAULT_ABI;
+-#if defined(MS_WIN32) && !defined(MS_WIN64) && !defined(_WIN32_WCE)
++#if defined(MS_WIN32) && !defined(MS_WIN64) && !defined(_WIN32_WCE) && (defined(__i386__) || defined(_M_IX86))
+     if ((flags & FUNCFLAG_CDECL) == 0)
+         cc = FFI_STDCALL;
+ #endif
