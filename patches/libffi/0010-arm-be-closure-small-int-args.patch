@@ -1,0 +1,51 @@
+diff --git a/src/arm/ffi.c b/src/arm/ffi.c
+index b6ff3ef..e23af33 100644
+--- a/src/arm/ffi.c
++++ b/src/arm/ffi.c
+@@ -475,6 +475,26 @@ ffi_call_go (ffi_cif *cif, void (*fn) (void), void *rvalue,
+ }
+ #endif
+ 
++#ifdef __ARMEB__
++/* Big-endian: an integer narrower than a word occupies the high-address
++   end of its 4-byte register or stack slot.  */
++static void
++be_small_int_args (ffi_cif *cif, void **avalue)
++{
++  unsigned i;
++  for (i = 0; i < cif->nargs; i++)
++    switch (cif->arg_types[i]->type)
++      {
++      case FFI_TYPE_SINT8:
++      case FFI_TYPE_UINT8:
++      case FFI_TYPE_SINT16:
++      case FFI_TYPE_UINT16:
++	avalue[i] = (char *) avalue[i] + 4 - cif->arg_types[i]->size;
++	break;
++      }
++}
++#endif
++
+ static void *
+ ffi_prep_incoming_args_SYSV (ffi_cif *cif, void *rvalue,
+ 			     char *argp, void **avalue)
+@@ -503,6 +523,9 @@ ffi_prep_incoming_args_SYSV (ffi_cif *cif, void *rvalue,
+       argp += z;
+     }
+ 
++#ifdef __ARMEB__
++  be_small_int_args (cif, avalue);
++#endif
+   return rvalue;
+ }
+ 
+@@ -584,6 +607,9 @@ ffi_prep_incoming_args_VFP (ffi_cif *cif, void *rvalue, char *stack,
+       argp += z;
+     }
+ 
++#ifdef __ARMEB__
++  be_small_int_args (cif, avalue);
++#endif
+   return rvalue;
+ }
+ 

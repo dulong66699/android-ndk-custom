@@ -1,0 +1,21 @@
+diff --git a/src/closures.c b/src/closures.c
+index c1fbcf8..d644e32 100644
+--- a/src/closures.c
++++ b/src/closures.c
+@@ -121,6 +121,16 @@ ffi_tramp_is_present (__attribute__((unused)) void *ptr)
+ {
+   return 0;
+ }
++
++void *
++ffi_data_to_code_pointer (void *data)
++{
++  void *dataseg, *codeseg;
++
++  dataseg = (void *)((uintptr_t)data & ~((uintptr_t)sysconf(_SC_PAGESIZE) - 1));
++  memcpy(&codeseg, ADD_TO_POINTER(dataseg, sizeof(size_t)), sizeof(void *));
++  return ADD_TO_POINTER(codeseg, (uintptr_t)data - (uintptr_t)dataseg);
++}
+ #else /* !NetBSD with PROT_MPROTECT */
+ 
+ #if !FFI_MMAP_EXEC_WRIT && !FFI_EXEC_TRAMPOLINE_TABLE

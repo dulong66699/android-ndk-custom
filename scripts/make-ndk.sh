@@ -645,11 +645,13 @@ build_pydeps() {
     # libffi matches configure.host against <cpu>-<vendor>-<os>, which neither
     # of our triple shapes gives it:
     #   x86-*             its table matches i?86, never a bare "x86"
+    #   arm64e-*          its table matches aarch64*, and config.sub keeps arm64e
     #   <cpu>-<os>-none   leaves "none" in the OS slot, so *-freebsd* etc. miss
     # Rewrite to the form its table expects. Everything else passes through.
     local ffi_host ffi_cpu ffi_os
     ffi_cpu="${TARGET%%-*}"
     [ "$ffi_cpu" = x86 ] && ffi_cpu=i686
+    [ "$ffi_cpu" = arm64e ] && ffi_cpu=aarch64
     case "$TARGET" in
       *-none) ffi_os="$(echo "$TARGET" | cut -d- -f2)"; ffi_host="$ffi_cpu-unknown-$ffi_os" ;;
       *)      ffi_host="$ffi_cpu-${TARGET#*-}" ;;

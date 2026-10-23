@@ -1,0 +1,15 @@
+diff --git a/src/loongarch/sysv.S b/src/loongarch/sysv.S
+index 0f469ba..ad7173d 100644
+--- a/src/loongarch/sysv.S
++++ b/src/loongarch/sysv.S
+@@ -45,8 +45,8 @@
+ 
+ #if defined(__loongarch_single_float)
+ # define FLTS 4
+-# define FLD fld.w
+-# define FST fst.w
++# define FLARG fld.w
++# define FSARG fst.w
+ #elif defined(__loongarch_double_float)
+ # define FLTS 8
+ # define FLARG fld.d

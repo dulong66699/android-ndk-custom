@@ -1,0 +1,90 @@
+diff --git a/src/arm/ffi.c b/src/arm/ffi.c
+index cfd3e9d..b6ff3ef 100644
+--- a/src/arm/ffi.c
++++ b/src/arm/ffi.c
+@@ -171,6 +171,24 @@ ffi_prep_args_SYSV (ffi_cif *cif, int flags, void *rvalue,
+     }
+ }
+ 
++#ifdef __ARMEB__
++/* Big-endian: the VFP registers are spilled and reloaded as d-registers,
++   which puts s(2k) at the high-address half of d(k) in memory.  Single-
++   precision values therefore live at slot (n ^ 1), not n.  */
++static void
++vfp_swap_float_pairs (char *p, size_t size)
++{
++  size_t k;
++  for (k = 0; k < FFI_ALIGN (size, 8); k += 8)
++    {
++      UINT32 t;
++      memcpy (&t, p + k, 4);
++      memmove (p + k, p + k + 4, 4);
++      memcpy (p + k + 4, &t, 4);
++    }
++}
++#endif
++
+ static void
+ ffi_prep_args_VFP (ffi_cif *cif, int flags, void *rvalue,
+                    void **avalue, char *stack, char *vfp_space)
+@@ -203,7 +221,17 @@ ffi_prep_args_VFP (ffi_cif *cif, int flags, void *rvalue,
+       /* Allocated in VFP registers. */
+       if (vi < cif->vfp_nargs && is_vfp_type)
+ 	{
+-	  char *vfp_slot = vfp_space + cif->vfp_args[vi++] * 4;
++	  int reg = cif->vfp_args[vi++];
++	  char *vfp_slot = vfp_space + reg * 4;
++#ifdef __ARMEB__
++	  if ((is_vfp_type & 0xff) == FFI_TYPE_FLOAT)
++	    {
++	      int j;
++	      for (j = 0; j < is_vfp_type >> 8; j++)
++		memcpy (vfp_space + ((reg + j) ^ 1) * 4, (char *) a + j * 4, 4);
++	      continue;
++	    }
++#endif
+ 	  ffi_put_arg (ty, a, vfp_slot);
+ 	  continue;
+ 	}
+@@ -424,6 +452,10 @@ ffi_call_int (ffi_cif * cif, void (*fn) (void), void *rvalue,
+       ffi_call_SYSV (stack, frame, fn);
+     }
+ 
++#ifdef __ARMEB__
++  if (flags == ARM_TYPE_VFP_N && (vfp_type_p (rtype) & 0xff) == FFI_TYPE_FLOAT)
++    vfp_swap_float_pairs (new_rvalue, rtype->size);
++#endif
+   if (rvalue && rvalue != new_rvalue)
+     memcpy (rvalue, new_rvalue, rtype->size);
+ }
+@@ -501,7 +533,18 @@ ffi_prep_incoming_args_VFP (ffi_cif *cif, void *rvalue, char *stack,
+ 
+       if (vi < cif->vfp_nargs && is_vfp_type)
+ 	{
+-	  avalue[i] = vfp_space + cif->vfp_args[vi++] * 4;
++	  int reg = cif->vfp_args[vi++];
++	  avalue[i] = vfp_space + reg * 4;
++#ifdef __ARMEB__
++	  if ((is_vfp_type & 0xff) == FFI_TYPE_FLOAT)
++	    {
++	      int j;
++	      char *buf = alloca (z);
++	      for (j = 0; j < is_vfp_type >> 8; j++)
++		memcpy (buf + j * 4, vfp_space + ((reg + j) ^ 1) * 4, 4);
++	      avalue[i] = buf;
++	    }
++#endif
+ 	  continue;
+ 	}
+       else if (!done_with_regs && !is_vfp_type)
+@@ -576,6 +619,10 @@ ffi_closure_inner_VFP (ffi_cif *cif,
+   void *rvalue = ffi_prep_incoming_args_VFP (cif, frame->result, frame->argp,
+ 					     frame->vfp_space, avalue);
+   fun (cif, rvalue, avalue, user_data);
++#ifdef __ARMEB__
++  if (cif->flags == ARM_TYPE_VFP_N && (vfp_type_p (cif->rtype) & 0xff) == FFI_TYPE_FLOAT)
++    vfp_swap_float_pairs (rvalue, cif->rtype->size);
++#endif
+   return cif->flags;
+ }
+ 
