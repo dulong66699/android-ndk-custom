@@ -1085,7 +1085,7 @@ build_python2() {
         echo '_multiprocessing _multiprocessing/multiprocessing.c _multiprocessing/socket_connection.c _multiprocessing/semaphore.c -I$(srcdir)/Modules/_multiprocessing'
         [ -f "$PYDEPS/lib/libffi.a" ] && echo "_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -I$PYDEPS/include -L$PYDEPS/lib -lffi"
       } > Modules/Setup.local
-      sed -i '/^cmath /s/ _math\.c//' Modules/Setup.local
+      sed -i -e '/^cmath /s/ _math\.c//' -e 's/-DXML_POOR_ENTROPY=1/-DXML_POOR_ENTROPY/' Modules/Setup.local
       sed -i 's/^    pythonapi = PyDLL(None)$/    try:\n        pythonapi = PyDLL(None)\n    except OSError:  # NDK: static interpreter, no dlopen()\n        pythonapi = None/' Lib/ctypes/__init__.py
     fi
 
