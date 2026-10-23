@@ -1023,6 +1023,77 @@ MODULE_BUILDTYPE=static
   )
 }
 
+# --- CPython 2.7 (only for NDKs that still ship it, e.g. r24) ----------------
+# The official NDK carries a Python 2.7 in prebuilt/<host> next to the
+# toolchain's python3 (ndk-stack runs on it), so rebuild it for every host.
+# windows applies msys2's last mingw-w64-python2 patch set (2.7.18-8) from
+# patches/windows/python2, in the order of its series file. Cross-compiling 2.7
+# needs a python2.7 of the same version on the build machine (setup.py and
+# pgen run on it), so one is built natively first.
+PY2_VERSION=2.7.18
+build_python2() {
+  NEED_PY2=no
+  [ -d "$LINUX_NDK/prebuilt/linux-x86_64/lib/python2.7" ] || return 0
+  NEED_PY2=yes
+  log "Building Python $PY2_VERSION"
+  ( cd "$BUILD"
+    fetch_unpack "https://www.python.org/ftp/python/$PY2_VERSION/Python-$PY2_VERSION.tar.xz" /tmp/python2.tar.xz
+    rm -rf python2-src; mv "Python-$PY2_VERSION" python2-src
+
+    # build python2.7, put on PATH for configure's PYTHON_FOR_BUILD probe
+    if [ ! -x "$BUILD/python2-host/bin/python2.7" ]; then
+      rm -rf python2-native; cp -a python2-src python2-native
+      ( cd python2-native
+        CC=/usr/bin/cc ./configure --prefix="$BUILD/python2-host" --without-ensurepip
+        make -j"$(ncpu)" && make install ) > "$BUILD/python2-host.log" 2>&1 \
+        || { tail -40 "$BUILD/python2-host.log" >&2; exit 1; }
+    fi
+    export PATH="$BUILD/python2-host/bin:$PATH"
+
+    rm -rf python2; cp -a python2-src python2
+    cd python2
+    if [ "$PLATFORM" = windows ]; then
+      # created by the patches
+      rm -f Misc/config_mingw Misc/cross_mingw32 Misc/python-config.sh.in \
+            Misc/python-config-u.sh.in Python/fileblocks.c Lib/list2cmdline.py
+      while IFS= read -r p; do
+        patch -Nbp1 -i "$ROOT/patches/windows/python2/$p" >/dev/null \
+          || { echo "python2: $p did not apply" >&2; exit 1; }
+      done < "$ROOT/patches/windows/python2/series"
+      autoreconf -vfi
+      touch Include/graminit.h Python/graminit.c Parser/Python.asdl Parser/asdl.py \
+            Parser/asdl_c.py Include/Python-ast.h Python/Python-ast.c
+      echo '""' > Parser/pgen.stamp
+      # libffi from build_pydeps; zlib too. expat stays bundled.
+      rm -r Modules/zlib Modules/_ctypes/darwin* Modules/_ctypes/libffi*
+    fi
+    cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" "$PWD/"
+    printf 'ac_cv_file__dev_ptmx=no\nac_cv_file__dev_ptc=no\n' > config.site
+
+    local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET"
+                 --without-ensurepip --with-threads
+                 CONFIG_SITE=config.site PKG_CONFIG=/bin/false
+                 CC="$CROSS_CC" CXX="$CROSS_CXX" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB"
+                 STRIP="$CROSS_STRIP" READELF="$NDK_LLVM_BIN/llvm-readelf"
+                 CPPFLAGS="-I$PYDEPS/include" )
+    case "$PLATFORM" in
+      windows) # as msys2's PKGBUILD; tzset/semaphores/getlogin probes misdetect
+               export ac_cv_working_tzset=no ac_cv_posix_semaphores_enabled=no \
+                      ac_cv_broken_sem_getvalue=no ac_cv_func_getlogin=no
+               export MSYSTEM=MINGW LIBFFI_INCLUDEDIR="$PYDEPS/include"
+               local laa=""; [ "$TARGET" = i686-w64-mingw32 ] && laa=" -Wl,--large-address-aware"
+               args+=( --enable-shared --with-system-ffi
+                       CFLAGS="-O2 -fwrapv -D__USE_MINGW_ANSI_STDIO=1 -Wno-incompatible-function-pointer-types -Wno-incompatible-pointer-types -Wno-int-conversion -Wno-error=implicit-function-declaration"
+                       LDFLAGS="-L$PYDEPS/lib -static-libgcc$laa"
+                       WINDRES="$TC/bin/${TARGET}-windres" ) ;;
+    esac
+    ./configure "${args[@]}"
+    make -j"$(ncpu)" 2>&1 | tee build_all.log
+    [ "${PIPESTATUS[0]}" = 0 ] || exit 1
+    make install
+  )
+}
+
 # --- strip the freshly built host tools -------------------------------------
 strip_deps() {
   local files f
