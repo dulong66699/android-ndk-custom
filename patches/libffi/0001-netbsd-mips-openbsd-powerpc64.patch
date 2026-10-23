@@ -1,0 +1,36 @@
+mips NetBSD and powerpc64 OpenBSD use the same ABIs as their FreeBSD/OpenBSD
+siblings but are not listed in configure.host. NetBSD has no <sgidefs.h>.
+
+diff -ruN a/configure.host b/configure.host
+--- a/configure.host
++++ b/configure.host
+@@ -184,7 +184,7 @@
+   mips-sgi-irix5.* | mips-sgi-irix6.* | mips*-*-rtems*)
+ 	TARGET=MIPS; TARGETDIR=mips
+ 	;;
+-  mips*-*linux* | mips*-*-openbsd* | mips*-*-freebsd*)
++  mips*-*linux* | mips*-*-openbsd* | mips*-*-freebsd* | mips*-*-netbsd*)
+ 	# Support 128-bit long double for NewABI.
+ 	HAVE_LONG_DOUBLE='defined(__mips64)'
+ 	TARGET=MIPS; TARGETDIR=mips
+@@ -224,7 +224,7 @@
+ 	TARGET=POWERPC_FREEBSD; TARGETDIR=powerpc
+ 	CFLAGS="$CFLAGS -D__NO_FPRS__"
+ 	;;
+-  powerpc64-*-freebsd* | powerpc64le-*-freebsd*)
++  powerpc64-*-freebsd* | powerpc64le-*-freebsd* | powerpc64-*-openbsd*)
+ 	TARGET=POWERPC; TARGETDIR=powerpc
+ 	;;
+   powerpc*-*-rtems*)
+diff -ruN a/src/mips/ffitarget.h b/src/mips/ffitarget.h
+--- a/src/mips/ffitarget.h
++++ b/src/mips/ffitarget.h
+@@ -39,7 +39,7 @@
+ #define _MIPS_SIM_ABI32		1
+ #define _MIPS_SIM_NABI32	2
+ #define _MIPS_SIM_ABI64		3
+-#elif !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(__linux__)
++#elif !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__linux__)
+ # include <sgidefs.h>
+ #endif
+ 

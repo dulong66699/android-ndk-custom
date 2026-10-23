@@ -1,0 +1,95 @@
+mips: pc-relative .eh_frame FDE addresses; lld rejects absptr in a shared
+object (R_MIPS_32/R_MIPS_64).
+
+diff -ruN a/src/mips/n32.S b/src/mips/n32.S
+--- a/src/mips/n32.S
++++ b/src/mips/n32.S
+@@ -748,10 +748,12 @@
+ .LSCIE1:
+         .4byte  0x0			# CIE
+         .byte   0x1			# Version 1
+-        .ascii  "\000"			# Augmentation
++        .ascii  "zR\000"			# Augmentation
+         .uleb128 0x1			# Code alignment 1
+         .sleb128 -4			# Data alignment -4
+         .byte   0x1f			# Return Address $31
++	.uleb128 0x1			# Augmentation size
++	.byte	0x1b			# FDE Encoding (pcrel|sdata4)
+         .byte   0xc			# DW_CFA_def_cfa
+         .uleb128 0x1d			# in $sp
+         .uleb128 0x0			# offset 0
+@@ -762,8 +764,9 @@
+         .4byte  .LEFDE0-.LASFDE0	# length.
+ .LASFDE0:
+         .4byte  .LASFDE0-.Lframe1	# CIE_pointer.
+-        FDE_ADDR_BYTES  .LFB0		# initial_location.
+-        FDE_ADDR_BYTES  .LFE0-.LFB0	# address_range.
++        .4byte  .LFB0-.		# initial_location.
++        .4byte  .LFE0-.LFB0	# address_range.
++        .uleb128 0x0		# Augmentation size
+         .byte   0x4			# DW_CFA_advance_loc4
+         .4byte  .LCFI00-.LFB0		# to .LCFI00
+         .byte   0xe			# DW_CFA_def_cfa_offset
+@@ -785,8 +788,9 @@
+ 	.4byte	.LEFDE1-.LASFDE1	# length
+ .LASFDE1:
+ 	.4byte	.LASFDE1-.Lframe1	# CIE_pointer.
+-	FDE_ADDR_BYTES	.LFB1		# initial_location.
+-	FDE_ADDR_BYTES	.LFE1-.LFB1	# address_range.
++	.4byte	.LFB1-.		# initial_location.
++	.4byte	.LFE1-.LFB1	# address_range.
++	.uleb128 0x0		# Augmentation size
+ 	.byte	0x4			# DW_CFA_advance_loc4
+ 	.4byte	.LCFI10-.LFB1		# to .LCFI10
+ 	.byte	0xe			# DW_CFA_def_cfa_offset
+@@ -804,8 +808,9 @@
+ 	.4byte	.LEFDE2-.LASFDE2	# length
+ .LASFDE2:
+ 	.4byte	.LASFDE2-.Lframe1	# CIE_pointer.
+-	FDE_ADDR_BYTES	.LFB2		# initial_location.
+-	FDE_ADDR_BYTES	.LFE2-.LFB2	# address_range.
++	.4byte	.LFB2-.		# initial_location.
++	.4byte	.LFE2-.LFB2	# address_range.
++	.uleb128 0x0		# Augmentation size
+ 	.byte	0x4			# DW_CFA_advance_loc4
+ 	.4byte	.LCFI20-.LFB2		# to .LCFI20
+ 	.byte	0xe			# DW_CFA_def_cfa_offset
+diff -ruN a/src/mips/o32.S b/src/mips/o32.S
+--- a/src/mips/o32.S
++++ b/src/mips/o32.S
+@@ -464,7 +464,7 @@
+ 	.sleb128 4	 # CIE Data Alignment Factor
+ 	.byte	0x1f	 # CIE RA Column
+ 	.uleb128 0x1	 # Augmentation size
+-	.byte	0x00	 # FDE Encoding (absptr)
++	.byte	0x1b	 # FDE Encoding (pcrel|sdata4)
+ 	.byte	0xc	 # DW_CFA_def_cfa
+ 	.uleb128 0x1d
+ 	.uleb128 0x0
+@@ -475,7 +475,7 @@
+ 	.4byte	$LEFDE0-$LASFDE0	 # FDE Length
+ $LASFDE0:
+ 	.4byte	$LASFDE0-$Lframe0	 # FDE CIE offset
+-	.4byte	$LFB0	 # FDE initial location
++	.4byte	$LFB0-.	 # FDE initial location
+ 	.4byte	$LFE0-$LFB0	 # FDE address range
+ 	.uleb128 0x0	 # Augmentation size
+ 	.byte	0x4	 # DW_CFA_advance_loc4
+@@ -502,7 +502,7 @@
+ 	.4byte	$LEFDE1-$LASFDE1	 # FDE Length
+ $LASFDE1:
+ 	.4byte	$LASFDE1-$Lframe0	 # FDE CIE offset
+-	.4byte	$LFB1	 # FDE initial location
++	.4byte	$LFB1-.	 # FDE initial location
+ 	.4byte	$LFE1-$LFB1	 # FDE address range
+ 	.uleb128 0x0	 # Augmentation size
+ 	.byte	0x4	 # DW_CFA_advance_loc4
+@@ -532,7 +532,7 @@
+ 	.4byte	$LEFDE2-$LASFDE2	 # FDE Length
+ $LASFDE2:
+ 	.4byte	$LASFDE2-$Lframe0	 # FDE CIE offset
+-	.4byte	$LFB2	 # FDE initial location
++	.4byte	$LFB2-.	 # FDE initial location
+ 	.4byte	$LFE2-$LFB2	 # FDE address range
+ 	.uleb128 0x0	 # Augmentation size
+ 	.byte	0x4	 # DW_CFA_advance_loc4

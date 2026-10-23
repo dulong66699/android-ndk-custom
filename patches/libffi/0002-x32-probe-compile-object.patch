@@ -1,0 +1,14 @@
+x32 vs i386 probe: compile to an object; the zig wrapper adds -c, so -S fails.
+
+diff -ruN a/configure.host b/configure.host
+--- a/configure.host
++++ b/configure.host
+@@ -119,7 +119,7 @@
+ 	TARGETDIR=x86
+ 	if test $ac_cv_sizeof_size_t = 4; then
+ 	  echo 'int foo (void) { return __x86_64__; }' > conftest.c
+-	  if $CC $CFLAGS -Werror -S conftest.c -o conftest.s > /dev/null 2>&1; then
++	  if $CC $CFLAGS -Werror -c conftest.c -o conftest.o > /dev/null 2>&1; then
+ 	    TARGET_X32=yes
+ 	    TARGET=X86_64
+ 	  else
