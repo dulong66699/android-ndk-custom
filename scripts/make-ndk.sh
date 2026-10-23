@@ -1081,7 +1081,15 @@ build_python2() {
         echo '_lsprof _lsprof.c rotatingtree.c'
         echo '_hotshot _hotshot.c'
         echo '_multiprocessing _multiprocessing/multiprocessing.c _multiprocessing/socket_connection.c _multiprocessing/semaphore.c -I$(srcdir)/Modules/_multiprocessing'
-        [ -f "$PYDEPS/lib/libffi.a" ] && echo "_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -I$PYDEPS/include -L$PYDEPS/lib -lffi"
+        if [ -f "$PYDEPS/lib/libffi.a" ]; then
+          # bionic: failing dlopen() & co. stubs, as for python3.
+          local ctypes_dl=""
+          if [ "$PLATFORM" = bionic ]; then
+            cp "$ROOT/patches/bionic/python3/dl_static.c" Modules/_ctypes/dl_static.c
+            ctypes_dl=" _ctypes/dl_static.c"
+          fi
+          echo "_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c$ctypes_dl -I$PYDEPS/include -L$PYDEPS/lib -lffi"
+        fi
       } > Modules/Setup.local
       sed -i -e '/^cmath /s/ _math\.c//' -e 's/-DXML_POOR_ENTROPY=1/-DXML_POOR_ENTROPY/' Modules/Setup.local
       if [ "$PLATFORM" = bionic ]; then
@@ -1113,6 +1121,15 @@ build_python2() {
                        WINDRES="$TC/bin/${TARGET}-windres" ) ;;
       linux)   args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $CROSS_CFLAGS"
                        LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS" ) ;;
+      bionic)  # static like python3; LIBC_N stub version script on 32-bit ARM.
+               local ndk_vs=""
+               case "$TARGET" in arm-*|armv7a-*|armv7l-*)
+                 ndk_vs="$PWD/ndk_version.map"
+                 printf '%s\n' 'LIBC_N { };' > "$ndk_vs"
+                 ndk_vs="-Wl,--version-script=$ndk_vs"
+               esac
+               args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -Dasm=__asm__"
+                       LDFLAGS="-L$PYDEPS/lib -static $ndk_vs $BIONIC_EXE_LDFLAGS" ) ;;
     esac
     ./configure "${args[@]}"
     make -j"$(ncpu)" 2>&1 | tee build_all.log
