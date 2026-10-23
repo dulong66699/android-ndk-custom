@@ -1071,6 +1071,11 @@ build_python2() {
       echo '""' > Parser/pgen.stamp
       # libffi from build_pydeps; zlib too. expat stays bundled.
       rm -r Modules/zlib Modules/_ctypes/darwin* Modules/_ctypes/libffi*
+      # msys2 builds natively, where setup.py's host_platform is win32; a
+      # cross build reports mingw, so _socket would lose ws2_32 and the like.
+      sed -i "s/host_platform == 'win32'/host_platform in ('mingw', 'win32')/" setup.py
+      # Lib/plat-win32 regen reads ${MINGW_PREFIX}/include/stddef.h
+      export MINGW_PREFIX="$TC/generic-w64-mingw32"
     fi
     cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" "$PWD/"
     printf 'ac_cv_file__dev_ptmx=no\nac_cv_file__dev_ptc=no\n' > config.site
