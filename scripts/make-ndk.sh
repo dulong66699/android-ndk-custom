@@ -1066,6 +1066,28 @@ build_python2() {
     done
     cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" "$PWD/"
     printf 'ac_cv_file__dev_ptmx=no\nac_cv_file__dev_ptc=no\nac_cv_buggy_getaddrinfo=no\n' > config.site
+    # static interpreters (musl, bionic) cannot load extension .so: build the
+    # stdlib modules in via Setup.local (setup.py then skips them).
+    local force_static_modules=no
+    [ "$PLATFORM" = bionic ] && force_static_modules=yes
+    case "$TARGET" in *musl*) [ "$PLATFORM" = linux ] && force_static_modules=yes ;; esac
+    if [ "$force_static_modules" = yes ]; then
+      {
+        echo '*static*'
+        sed -nE 's/^#((array|cmath|math|_struct|time|operator|_random|_collections|_heapq|itertools|strop|_functools|_elementtree|datetime|_bisect|unicodedata|_locale|_io|fcntl|spwd|grp|select|mmap|_csv|crypt|termios|resource|audioop|_md5|_sha|_sha256|_sha512|syslog|binascii|parser|cStringIO|cPickle|pyexpat|_multibytecodec|_codecs_(cn|hk|iso2022|jp|kr|tw))[[:space:]].*)$/\1/p' Modules/Setup.dist
+        echo '_socket socketmodule.c'
+        echo "zlib zlibmodule.c -I$PYDEPS/include -L$PYDEPS/lib -lz"
+        echo "bz2 bz2module.c -I$PYDEPS/include -L$PYDEPS/lib -lbz2"
+        echo '_json _json.c'
+        echo 'future_builtins future_builtins.c'
+        echo '_lsprof _lsprof.c rotatingtree.c'
+        echo '_hotshot _hotshot.c'
+        echo '_multiprocessing _multiprocessing/multiprocessing.c _multiprocessing/socket_connection.c _multiprocessing/semaphore.c -I$(srcdir)/Modules/_multiprocessing'
+        [ -f "$PYDEPS/lib/libffi.a" ] && echo "_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -I$PYDEPS/include -L$PYDEPS/lib -lffi"
+      } > Modules/Setup.local
+      sed -i '/^cmath /s/ _math\.c//' Modules/Setup.local
+      sed -i 's/^    pythonapi = PyDLL(None)$/    try:\n        pythonapi = PyDLL(None)\n    except OSError:  # NDK: static interpreter, no dlopen()\n        pythonapi = None/' Lib/ctypes/__init__.py
+    fi
 
     local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET"
                  --without-ensurepip --with-threads
