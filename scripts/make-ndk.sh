@@ -127,6 +127,8 @@ git_fetch() {
 resolve_shaderc_ref() {
   if git ls-remote --exit-code --tags "$SHADERC_BASE/shaderc" "refs/tags/$NDK_TAG" >/dev/null 2>&1; then
     echo "refs/tags/$NDK_TAG"
+  elif [ "$NDK_VERSION" -le 24 ]; then
+    echo "refs/tags/ndk-r$NDK_VERSION"
   else
     echo "refs/heads/mirror-goog-main-ndk"
   fi
@@ -523,8 +525,8 @@ build_shaderc() {
       fi
       ;;
   esac
-  ( cd "$SH/third_party/spirv-tools" && git init --quiet && git apply "$ROOT/patches/ndk/spirv/full_static.patch" && rm -rf .git )
-  ( cd "$SH" && git init --quiet && git apply "$ROOT/patches/ndk/shaderc/full_static.patch" && rm -rf .git )
+  [ "$NDK_VERSION" -ge 24 ] && ( cd "$SH/third_party/spirv-tools" && git init --quiet && git apply "$ROOT/patches/ndk/spirv/full_static.patch" && rm -rf .git )
+  [ "$NDK_VERSION" -ge 23 ] && ( cd "$SH" && git init --quiet && git apply "$ROOT/patches/ndk/shaderc/full_static.patch" && rm -rf .git )
   grep -rlE "distutils|'rU'" --include='*.py' "$SH/third_party" | xargs -r sed -i \
     -e 's/^import distutils\.dir_util$/import os/' \
     -e 's/distutils\.dir_util\.mkpath(\(.*\))$/os.makedirs(\1, exist_ok=True)/' \
