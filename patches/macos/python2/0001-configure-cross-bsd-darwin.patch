@@ -1,0 +1,34 @@
+Python 2 only cross-builds for Linux and Cygwin. Map the BSDs and Darwin to
+their uname -s names so the platform-specific configure paths apply.
+
+--- a/configure
++++ b/configure
+@@ -3287,6 +3287,18 @@
+ 	*-*-cygwin*)
+ 		ac_sys_system=Cygwin
+ 		;;
++	*-*-freebsd*)
++		ac_sys_system=FreeBSD
++		;;
++	*-*-netbsd*)
++		ac_sys_system=NetBSD
++		;;
++	*-*-openbsd*)
++		ac_sys_system=OpenBSD
++		;;
++	*-*-darwin*)
++		ac_sys_system=Darwin
++		;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+ 		MACHDEP="unknown"
+@@ -3333,6 +3345,9 @@
+ 	*-*-cygwin*)
+ 		_host_cpu=
+ 		;;
++	*-*-freebsd*|*-*-netbsd*|*-*-openbsd*|*-*-darwin*)
++		_host_cpu=$host_cpu
++		;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+ 		MACHDEP="unknown"

@@ -1121,6 +1121,16 @@ build_python2() {
                        WINDRES="$TC/bin/${TARGET}-windres" ) ;;
       linux)   args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $CROSS_CFLAGS"
                        LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS" ) ;;
+      bsd)     # as for python3: PIC throughout, and export the interpreter's
+               # symbols to the shared stdlib modules.
+               local obsd=""; [ "$SYSTEM_NAME" = OpenBSD ] && obsd="-D_BSD_SOURCE"
+               args+=( CFLAGS="-fPIC -fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $obsd $CROSS_CFLAGS"
+                       LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS"
+                       LINKFORSHARED="-Wl,--export-dynamic" ) ;;
+      macos)   # as for python3: modules resolve Python symbols at dlopen().
+               args+=( CFLAGS="-D_DARWIN_C_SOURCE -fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $CROSS_CFLAGS"
+                       LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS"
+                       LDSHARED="$CROSS_CC -bundle -undefined dynamic_lookup" ) ;;
       bionic)  # static like python3; LIBC_N stub version script on 32-bit ARM.
                local ndk_vs=""
                case "$TARGET" in arm-*|armv7a-*|armv7l-*)
