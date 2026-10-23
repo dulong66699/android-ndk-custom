@@ -762,7 +762,7 @@ build_python() {
     # requires Python.h before any system header — thread_pthread.h is included
     # well after Python.h, so the ordering stays correct.
     if [ "$PLATFORM" = bionic ]; then
-      cp "$ROOT/patches/bionic/sem_clockwait.h" Python/sem_clockwait.h
+      cp "$ROOT/patches/bionic/python3/sem_clockwait.h" Python/sem_clockwait.h
       sed -i '1i #include "sem_clockwait.h"' Python/thread_pthread.h
       # getrandom: bionic declares it only from API 28, but configure finds it in
       # libc.a and sets HAVE_GETRANDOM. Below 28, take the raw syscall path.
@@ -778,7 +778,7 @@ build_python() {
       # compile below 34. Inject a syscall-backed impl right after each caller's
       # Python.h (so it follows Python's feature macros). grep tracks the caller
       # set across CPython versions.
-      cr="$ROOT/patches/bionic/close_range.h"
+      cr="$ROOT/patches/bionic/python3/close_range.h"
       grep -rl 'close_range(' Python Modules 2>/dev/null | while IFS= read -r f; do
         sed -i "s|#include \"Python.h\"|#include \"Python.h\"\n#include \"$cr\"|" "$f"
       done
@@ -788,7 +788,7 @@ build_python() {
       # at API<26, posix_spawn at API<28) or suppressed by CPython's _POSIX_C_SOURCE
       # (fexecve).  Inject the compat header after Python.h in every file that
       # references one of the affected functions.
-      lc="$ROOT/patches/bionic/libc_compat.h"
+      lc="$ROOT/patches/bionic/python3/libc_compat.h"
       for fn in ctermid futimes lutimes fexecve posix_spawn preadv2 pwritev2 copy_file_range getloadavg; do
         grep -rl "${fn}(" Python Modules 2>/dev/null | while IFS= read -r f; do
           grep -qF "$lc" "$f" && continue
@@ -880,7 +880,7 @@ MODULE_BUILDTYPE=static
       if [ -f "$PYDEPS/lib/libffi.a" ]; then
         local ctypes_dl=""
         if [ "$PLATFORM" = bionic ]; then
-          cp "$ROOT/patches/bionic/dl_static.c" Modules/_ctypes/dl_static.c
+          cp "$ROOT/patches/bionic/python3/dl_static.c" Modules/_ctypes/dl_static.c
           ctypes_dl=" _ctypes/dl_static.c"
         fi
         printf '*static*\n_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c%s -I%s/include -L%s/lib -lffi -DHAVE_FFI_PREP_CIF_VAR -DHAVE_FFI_PREP_CLOSURE_LOC -DHAVE_FFI_CLOSURE_ALLOC\n' \
