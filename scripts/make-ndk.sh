@@ -1084,7 +1084,14 @@ build_python2() {
         [ -f "$PYDEPS/lib/libffi.a" ] && echo "_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -I$PYDEPS/include -L$PYDEPS/lib -lffi"
       } > Modules/Setup.local
       sed -i -e '/^cmath /s/ _math\.c//' -e 's/-DXML_POOR_ENTROPY=1/-DXML_POOR_ENTROPY/' Modules/Setup.local
-      [ "$PLATFORM" = bionic ] && sed -i '/^spwd /d; /^crypt /d' Modules/Setup.local
+      if [ "$PLATFORM" = bionic ]; then
+        sed -i '/^spwd /d; /^crypt /d' Modules/Setup.local
+        # getgrent() & co. and nl_langinfo() arrived in API 26.
+        if [ "$API" -lt 26 ]; then
+          sed -i '/^grp /d' Modules/Setup.local
+          echo ac_cv_header_langinfo_h=no >> config.site
+        fi
+      fi
       sed -i 's/^    pythonapi = PyDLL(None)$/    try:\n        pythonapi = PyDLL(None)\n    except OSError:  # NDK: static interpreter, no dlopen()\n        pythonapi = None/' Lib/ctypes/__init__.py
     fi
 
