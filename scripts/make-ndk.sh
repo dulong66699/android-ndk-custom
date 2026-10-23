@@ -1058,7 +1058,7 @@ build_python2() {
       patch -Np1 -i "$p" >/dev/null || { echo "python2: $(basename "$p") did not apply" >&2; exit 1; }
     done
     cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" "$PWD/"
-    printf 'ac_cv_file__dev_ptmx=no\nac_cv_file__dev_ptc=no\n' > config.site
+    printf 'ac_cv_file__dev_ptmx=no\nac_cv_file__dev_ptc=no\nac_cv_buggy_getaddrinfo=no\n' > config.site
 
     local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET"
                  --without-ensurepip --with-threads
