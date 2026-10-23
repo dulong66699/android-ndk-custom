@@ -1103,7 +1103,8 @@ build_python2() {
       sed -i 's/^    pythonapi = PyDLL(None)$/    try:\n        pythonapi = PyDLL(None)\n    except OSError:  # NDK: static interpreter, no dlopen()\n        pythonapi = None/' Lib/ctypes/__init__.py
     fi
 
-    local args=( --prefix="$PWD/build" --build=x86_64-linux-gnu --host="$TARGET"
+    # build != host even for x86_64-linux-gnu, or setup.py uses this machine's headers.
+    local args=( --prefix="$PWD/build" --build=x86_64-unknown-linux-gnu --host="$TARGET"
                  --without-ensurepip --with-threads
                  CONFIG_SITE=config.site PKG_CONFIG=/bin/false
                  CC="$CROSS_CC" CXX="$CROSS_CXX" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB"

@@ -1,5 +1,6 @@
 Python 2 only cross-builds for Linux and Cygwin. Map the BSDs and Darwin to
-their uname -s names so the platform-specific configure paths apply.
+their uname -s names so the platform-specific configure paths apply, and on
+Darwin take the architecture from the host triple rather than /usr/bin/arch.
 
 --- a/configure
 +++ b/configure
@@ -7,16 +8,16 @@ their uname -s names so the platform-specific configure paths apply.
  	*-*-cygwin*)
  		ac_sys_system=Cygwin
  		;;
-+	*-*-freebsd*)
++	*-freebsd*)
 +		ac_sys_system=FreeBSD
 +		;;
-+	*-*-netbsd*)
++	*-netbsd*)
 +		ac_sys_system=NetBSD
 +		;;
-+	*-*-openbsd*)
++	*-openbsd*)
 +		ac_sys_system=OpenBSD
 +		;;
-+	*-*-darwin*)
++	*-darwin*)
 +		ac_sys_system=Darwin
 +		;;
  	*)
@@ -26,9 +27,21 @@ their uname -s names so the platform-specific configure paths apply.
  	*-*-cygwin*)
  		_host_cpu=
  		;;
-+	*-*-freebsd*|*-*-netbsd*|*-*-openbsd*|*-*-darwin*)
++	*-freebsd*|*-netbsd*|*-openbsd*|*-darwin*)
 +		_host_cpu=$host_cpu
 +		;;
  	*)
  		# for now, limit cross builds to known configurations
  		MACHDEP="unknown"
+@@ -8454,7 +8469,10 @@
+ fi
+ 
+ 
+-    if test "${ac_osx_32bit}" = "yes"; then
++    if test "$cross_compiling" = yes; then
++    	# only feeds LIBTOOL_CRUFT (framework builds); don't ask this machine
++    	MACOSX_DEFAULT_ARCH="$host_cpu"
++    elif test "${ac_osx_32bit}" = "yes"; then
+     	case `/usr/bin/arch` in
+     	i386)
+     		MACOSX_DEFAULT_ARCH="i386"
