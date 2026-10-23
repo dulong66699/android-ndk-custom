@@ -1030,7 +1030,7 @@ MODULE_BUILDTYPE=static
 # The official NDK carries a Python 2.7 in prebuilt/<host> next to the
 # toolchain's python3 (ndk-stack runs on it), so rebuild it for every host.
 # windows applies msys2's last mingw-w64-python2 patch set (2.7.18-8) from
-# patches/windows/python2, in the order of its series file. Cross-compiling 2.7
+# patches/windows/python2. Cross-compiling 2.7
 # needs a python2.7 of the same version on the build machine (setup.py and
 # pgen run on it), so one is built natively first.
 PY2_VERSION=2.7.18
@@ -1059,10 +1059,9 @@ build_python2() {
       # created by the patches
       rm -f Misc/config_mingw Misc/cross_mingw32 Misc/python-config.sh.in \
             Misc/python-config-u.sh.in Python/fileblocks.c Lib/list2cmdline.py
-      while IFS= read -r p; do
-        patch -Nbp1 -i "$ROOT/patches/windows/python2/$p" >/dev/null \
-          || { echo "python2: $p did not apply" >&2; exit 1; }
-      done < "$ROOT/patches/windows/python2/series"
+      for p in "$ROOT"/patches/windows/python2/*.patch; do
+        patch -Nbp1 -i "$p" >/dev/null || { echo "python2: $(basename "$p") did not apply" >&2; exit 1; }
+      done
       autoreconf -vfi
       touch Include/graminit.h Python/graminit.c Parser/Python.asdl Parser/asdl.py \
             Parser/asdl_c.py Include/Python-ast.h Python/Python-ast.c
