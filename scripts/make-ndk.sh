@@ -525,6 +525,10 @@ build_shaderc() {
   esac
   ( cd "$SH/third_party/spirv-tools" && git init --quiet && git apply "$ROOT/patches/ndk/spirv/full_static.patch" && rm -rf .git )
   ( cd "$SH" && git init --quiet && git apply "$ROOT/patches/ndk/shaderc/full_static.patch" && rm -rf .git )
+  grep -rlE "distutils|'rU'" --include='*.py' "$SH/third_party" | xargs -r sed -i \
+    -e 's/^import distutils\.dir_util$/import os/' \
+    -e 's/distutils\.dir_util\.mkpath(\(.*\))$/os.makedirs(\1, exist_ok=True)/' \
+    -e "s/mode='rU'/mode='r'/"
   # big-endian hosts: glslc writes the SPIR-V words in host byte order, but
   # .spv files are little-endian (Android/Vulkan load them as LE words, and
   # official glslc only runs on LE hosts). Byte-swap binary output there.
