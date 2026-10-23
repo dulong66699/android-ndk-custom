@@ -1,0 +1,33 @@
+Cross-built from Linux, setup.py's host_platform is "mingw", not the
+"win32" msys2 sees building natively, so its win32-only branches (ws2_32
+for _socket among them) were skipped. Treat both the same.
+
+--- a/setup.py
++++ b/setup.py
+@@ -916,7 +916,7 @@
+ 
+         # socket(2)
+         _socket_libs = math_libs
+-        if host_platform == 'win32':
++        if host_platform in ('mingw', 'win32'):
+             _socket_libs.append('ws2_32')
+         exts.append( Extension('_socket', ['socketmodule.c', 'timemodule.c'],
+                                depends=['socketmodule.h'],
+@@ -1670,7 +1670,7 @@
+         self.detect_ctypes(inc_dirs, lib_dirs)
+ 
+         # Richard Oudkerk's multiprocessing module
+-        if host_platform == 'win32':             # Windows
++        if host_platform in ('mingw', 'win32'):             # Windows
+             macros = dict()
+             libraries = ['ws2_32']
+ 
+@@ -2074,7 +2074,7 @@
+         if host_platform == 'sunos5':
+             include_dirs.append('/usr/openwin/include')
+             added_lib_dirs.append('/usr/openwin/lib')
+-        elif host_platform == 'win32':
++        elif host_platform in ('mingw', 'win32'):
+             # mingw&win32 don't use X11 headers and libraries
+             pass
+         elif os.path.exists('/usr/X11R6/include'):
