@@ -631,7 +631,10 @@ build_pydeps() {
       make -j"$(ncpu)" install )
   fi
 
-  if [ ! -f "$PYDEPS/lib/libffi.a" ]; then
+  # arm64ec: no libffi port; configure.host's arm*-*-mingw* would build the
+  # 32-bit ARM backend.
+  case "$TARGET" in arm64ec-*) log "libffi has no arm64ec port; _ctypes will be absent" ;; esac
+  if [ ! -f "$PYDEPS/lib/libffi.a" ] && [ "${TARGET%%-*}" != arm64ec ]; then
     # libffi matches configure.host against <cpu>-<vendor>-<os>, which neither
     # of our triple shapes gives it:
     #   x86-*             its table matches i?86, never a bare "x86"
@@ -660,8 +663,8 @@ build_pydeps() {
     # builtin goes through compiler-rt, which issues sysarch() itself.
     case "$TARGET" in mips*-netbsd-*) ffi_cf="$ffi_cf -DUSE__BUILTIN___CLEAR_CACHE=1" ;; esac
     ( cd "$BUILD"
-      fetch_unpack https://github.com/libffi/libffi/releases/download/v3.4.6/libffi-3.4.6.tar.gz /tmp/libffi.tar.gz
-      cd libffi-3.4.6
+      fetch_unpack https://github.com/libffi/libffi/releases/download/v3.8.0/libffi-3.8.0.tar.gz /tmp/libffi.tar.gz
+      cd libffi-3.8.0
       cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" .
       # mips NetBSD and powerpc64 OpenBSD use the same ABIs as their FreeBSD/
       # OpenBSD siblings, but configure.host lists neither ("not ported").
@@ -669,7 +672,7 @@ build_pydeps() {
       # libffi already relies on for Free/OpenBSD.
       sed -i -e 's/^\(  mips\*-\*linux\* | mips\*-\*-openbsd\* | mips\*-\*-freebsd\*\))$/\1 | mips*-*-netbsd*)/' \
              -e 's/^\(  powerpc64-\*-freebsd\* | powerpc64le-\*-freebsd\*\))$/\1 | powerpc64-*-openbsd*)/' configure.host
-      sed -i 's/^#elif !defined(__OpenBSD__) && !defined(__FreeBSD__)$/& \&\& !defined(__NetBSD__)/' src/mips/ffitarget.h
+      sed -i 's/^#elif !defined(__OpenBSD__) && !defined(__FreeBSD__)/& \&\& !defined(__NetBSD__)/' src/mips/ffitarget.h
       # x32: configure.host tells x32 from i386 with a `cc -Werror -S` probe,
       # which fails under the zig wrapper (see ffi_args), so x32 got the i386
       # backend and none of the X86_64 symbols. Compile to an object instead.
@@ -686,7 +689,7 @@ build_pydeps() {
              -e 's/^\([ \t]*\)FDE_ADDR_BYTES\([ \t]*\)\(\.LFE[0-9]-\.LFB[0-9]\)\(\t*# address_range\.\)$/\1.4byte\2\3\4\n\1.uleb128 0x0\t\t# Augmentation size/' src/mips/n32.S
       if [ "$(grep -c 'mips\*-\*-netbsd\*)$\|powerpc64-\*-openbsd\*)$' configure.host)" != 2 ] \
          || ! grep -q 'Werror -c conftest.c -o conftest.o' configure.host \
-         || ! grep -q '!defined(__NetBSD__)$' src/mips/ffitarget.h \
+         || ! grep -q '^#elif .*!defined(__NetBSD__)' src/mips/ffitarget.h \
          || [ "$(grep -c 'LFB[0-9]-\.' src/mips/o32.S)" != 3 ] || [ "$(grep -c 'LFB[0-9]-\.' src/mips/n32.S)" != 3 ] \
          || [ "$(grep -c 'Augmentation size' src/mips/n32.S)" != 4 ] || grep -q 'FDE_ADDR_BYTES' src/mips/n32.S; then
         echo "libffi: source edits did not apply" >&2; exit 1
