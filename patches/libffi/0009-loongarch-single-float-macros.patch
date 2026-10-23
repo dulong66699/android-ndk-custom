@@ -1,15 +1,41 @@
+diff --git a/src/loongarch/ffi.c b/src/loongarch/ffi.c
+index e81842b..fb5ba84 100644
+--- a/src/loongarch/ffi.c
++++ b/src/loongarch/ffi.c
+@@ -33,12 +33,14 @@
+ #include <stdlib.h>
+ #include <stdint.h>
+ 
++/* clang with the single-float ABI on a 64-bit FPU (+d) still passes and
++   returns doubles in FPRs, so follow the register width, not the ABI.  */
+ #if defined(__loongarch_soft_float)
+ # define ABI_FRLEN 0
+-#elif defined(__loongarch_single_float)
++#elif defined(__loongarch_single_float) && !(defined(__clang__) && __loongarch_frlen == 64)
+ # define ABI_FRLEN 32
+ # define ABI_FLOAT float
+-#elif defined(__loongarch_double_float)
++#elif defined(__loongarch_double_float) || defined(__loongarch_single_float)
+ # define ABI_FRLEN 64
+ # define ABI_FLOAT double
+ #else
 diff --git a/src/loongarch/sysv.S b/src/loongarch/sysv.S
-index 0f469ba..ad7173d 100644
+index 0f469ba..f895499 100644
 --- a/src/loongarch/sysv.S
 +++ b/src/loongarch/sysv.S
-@@ -45,8 +45,8 @@
+@@ -43,11 +43,11 @@
+ # define ADDI addi.w
+ #endif
  
- #if defined(__loongarch_single_float)
+-#if defined(__loongarch_single_float)
++#if defined(__loongarch_single_float) && !(defined(__clang__) && __loongarch_frlen == 64)
  # define FLTS 4
 -# define FLD fld.w
 -# define FST fst.w
-+# define FLARG fld.w
-+# define FSARG fst.w
- #elif defined(__loongarch_double_float)
+-#elif defined(__loongarch_double_float)
++# define FLARG fld.s
++# define FSARG fst.s
++#elif defined(__loongarch_double_float) || defined(__loongarch_single_float)
  # define FLTS 8
  # define FLARG fld.d
+ # define FSARG fst.d
