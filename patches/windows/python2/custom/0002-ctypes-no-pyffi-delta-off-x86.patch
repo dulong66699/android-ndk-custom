@@ -1,5 +1,6 @@
 USE_PYFFI_DELTA selects Python's old bundled x86 libffi_msvc, keyed on the
-system libffi not defining X86_ANY. Off x86 (aarch64 mingw) there is no
+system libffi not defining X86_ANY. Off x86 (aarch64 and arm64ec mingw, the
+latter defining __x86_64__ too) there is no
 such copy; ffi_call returns void and the delta assignment fails to compile.
 
 --- a/Modules/_ctypes/callproc.c
@@ -9,7 +10,7 @@ such copy; ffi_call returns void and the delta assignment fails to compile.
  #undef USE_PYFFI_DELTA
  #ifdef MS_WIN32
 -#ifdef X86_ANY
-+#if defined(X86_ANY) || !(defined(__i386__) || defined(__x86_64__))
++#if defined(X86_ANY) || defined(__arm64ec__) || !(defined(__i386__) || defined(__x86_64__))
  /* NOTE:
   * - Standard library does not calculate stack pointer difference
   *   unlike python specific for MSVC source.

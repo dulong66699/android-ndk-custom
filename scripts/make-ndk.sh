@@ -638,20 +638,19 @@ build_pydeps() {
       make -j"$(ncpu)" install )
   fi
 
-  # arm64ec: no libffi port; configure.host's arm*-*-mingw* would build the
-  # 32-bit ARM backend.
-  case "$TARGET" in arm64ec-*) log "libffi has no arm64ec port; _ctypes will be absent" ;; esac
-  if [ ! -f "$PYDEPS/lib/libffi.a" ] && [ "${TARGET%%-*}" != arm64ec ]; then
+  if [ ! -f "$PYDEPS/lib/libffi.a" ]; then
     # libffi matches configure.host against <cpu>-<vendor>-<os>, which neither
     # of our triple shapes gives it:
     #   x86-*             its table matches i?86, never a bare "x86"
     #   arm64e-*          its table matches aarch64*, and config.sub keeps arm64e
+    #   arm64ec-*         its arm*-*-mingw* entry is the 32-bit ARM backend; Arm64EC
+    #                     is the Windows AArch64 one (patches/libffi/0012)
     #   <cpu>-<os>-none   leaves "none" in the OS slot, so *-freebsd* etc. miss
     # Rewrite to the form its table expects. Everything else passes through.
     local ffi_host ffi_cpu ffi_os
     ffi_cpu="${TARGET%%-*}"
     [ "$ffi_cpu" = x86 ] && ffi_cpu=i686
-    [ "$ffi_cpu" = arm64e ] && ffi_cpu=aarch64
+    case "$ffi_cpu" in arm64e|arm64ec) ffi_cpu=aarch64 ;; esac
     case "$TARGET" in
       *-none) ffi_os="$(echo "$TARGET" | cut -d- -f2)"; ffi_host="$ffi_cpu-unknown-$ffi_os" ;;
       *)      ffi_host="$ffi_cpu-${TARGET#*-}" ;;

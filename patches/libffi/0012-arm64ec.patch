@@ -1,0 +1,274 @@
+diff --git a/src/aarch64/ffi.c b/src/aarch64/ffi.c
+index 0425ed1..8bd2ecb 100644
+--- a/src/aarch64/ffi.c
++++ b/src/aarch64/ffi.c
+@@ -19,7 +19,7 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
+ 
+-#if defined(__aarch64__) || defined(__arm64__)|| defined (_M_ARM64)
++#if defined(__aarch64__) || defined(__arm64__)|| defined (_M_ARM64) || defined(__arm64ec__)
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdint.h>
+@@ -793,6 +793,11 @@ ffi_prep_cif_machdep_var(ffi_cif *cif, unsigned int nfixedargs, unsigned int nto
+ {
+   ffi_status status = ffi_prep_cif_machdep (cif);
+   cif->flags |= AARCH64_FLAG_VARARG;
++#ifdef __arm64ec__
++  /* x64 rules: one 8-byte slot per argument past the first four.  */
++  if (ntotalargs > 4 && cif->bytes < FFI_ALIGN ((ntotalargs - 4) * 8, 16))
++    cif->bytes = FFI_ALIGN ((ntotalargs - 4) * 8, 16);
++#endif
+   return status;
+ }
+ #endif /* __APPLE__ */
+@@ -850,6 +855,55 @@ ffi_call_int (ffi_cif *cif, void (*fn)(void), void *orig_rvalue,
+   rvalue = (rsize ? (void*)((uintptr_t)frame + 40) : orig_rvalue);
+ 
+   arg_init (&state, stack_bytes);
++#ifdef __arm64ec__
++  if (isvariadic)
++    {
++      /* Arm64EC variadic calls follow the x64 rules (clang's
++	 classifyArgForArm64ECVarArg, LLVM's CC_AArch64_Arm64EC_VarArg):
++	 each argument takes one 8-byte slot, the first four in x0-x3 and
++	 the rest on the stack, floating-point values included; aggregates
++	 that are not 1, 2, 4 or 8 bytes are passed by reference.  x4
++	 points at the stack arguments and x5 holds their size.  */
++      size_t nsaa = 0;
++      for (i = 0, nargs = cif->nargs; i < nargs; i++)
++	{
++	  ffi_type *ty = cif->arg_types[i];
++	  size_t s = ty->size;
++	  UINT64 slot = 0;
++
++	  switch (ty->type)
++	    {
++	    case FFI_TYPE_FLOAT:
++	    case FFI_TYPE_DOUBLE:
++	    case FFI_TYPE_LONGDOUBLE:
++	    case FFI_TYPE_STRUCT:
++	    case FFI_TYPE_COMPLEX:
++	      if (s == 1 || s == 2 || s == 4 || s == 8)
++		memcpy (&slot, avalue[i], s);
++	      else
++		{
++		  void *copy = alloca (s);
++		  memcpy (copy, avalue[i], s);
++		  slot = (uintptr_t) copy;
++		}
++	      break;
++	    default:
++	      slot = extend_integer_type (avalue[i], ty->type);
++	      break;
++	    }
++	  if (i < 4)
++	    context->x[i] = slot;
++	  else
++	    {
++	      memcpy ((char *) stack + nsaa, &slot, 8);
++	      nsaa += 8;
++	    }
++	}
++      context->x[4] = (uintptr_t) stack;
++      context->x[5] = nsaa;
++      goto do_call;
++    }
++#endif
+   for (i = 0, nargs = cif->nargs; i < nargs; i++)
+     {
+       ffi_type *ty = cif->arg_types[i];
+@@ -993,6 +1047,9 @@ ffi_call_int (ffi_cif *cif, void (*fn)(void), void *orig_rvalue,
+ #endif
+     }
+ 
++#ifdef __arm64ec__
++ do_call:
++#endif
+   ffi_call_SYSV (context, frame, fn, rvalue, flags, closure);
+ 
+   if (flags & AARCH64_RET_NEED_COPY)
+diff --git a/src/aarch64/sysv.S b/src/aarch64/sysv.S
+index ccf2a3d..c0b018f 100644
+--- a/src/aarch64/sysv.S
++++ b/src/aarch64/sysv.S
+@@ -19,7 +19,7 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
+ 
+-#if defined(__aarch64__) || defined(__arm64__)
++#if defined(__aarch64__) || defined(__arm64__) || defined(__arm64ec__)
+ #define LIBFFI_ASM
+ #include <fficonfig.h>
+ #include <ffi.h>
+@@ -40,6 +40,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
+ #endif
+ #endif
+ 
++/* Arm64EC: C code calls the "#"-prefixed native symbol of a function, so
++   each global function here gets that name as well.  */
++
+ #ifdef __APPLE__
+ # define L(X)     CONCAT1(L, X)
+ #else
+@@ -303,6 +306,10 @@ CNAME(ffi_call_SYSV):
+ 	cfi_endproc
+ 
+ 	.globl	CNAME(ffi_call_SYSV)
++#ifdef __arm64ec__
++	.globl	"#ffi_call_SYSV"
++	.set	"#ffi_call_SYSV", ffi_call_SYSV
++#endif
+ 	FFI_HIDDEN(CNAME(ffi_call_SYSV))
+ #ifdef __ELF__
+ 	.type	CNAME(ffi_call_SYSV), #function
+@@ -347,6 +354,10 @@ CNAME(ffi_closure_SYSV_V):
+ 	cfi_endproc
+ 
+ 	.globl	CNAME(ffi_closure_SYSV_V)
++#ifdef __arm64ec__
++	.globl	"#ffi_closure_SYSV_V"
++	.set	"#ffi_closure_SYSV_V", ffi_closure_SYSV_V
++#endif
+ 	FFI_HIDDEN(CNAME(ffi_closure_SYSV_V))
+ #ifdef __ELF__
+ 	.type	CNAME(ffi_closure_SYSV_V), #function
+@@ -382,7 +393,11 @@ L(do_closure):
+ 	add	x4, sp, #ffi_closure_SYSV_FS		/* load stack */
+ 	add	x5, sp, #16+CALL_CONTEXT_SIZE		/* load rvalue */
+ 	mov	x6, x8					/* load struct_rval */
++#ifdef __arm64ec__
++	bl	"#ffi_closure_SYSV_inner"
++#else
+ 	bl      CNAME(ffi_closure_SYSV_inner)
++#endif
+ 
+ 	/* Load the return value as directed.  */
+ 	adr	x1, 0f
+@@ -526,6 +541,10 @@ L(do_closure):
+ 	cfi_endproc
+ 
+ 	.globl	CNAME(ffi_closure_SYSV)
++#ifdef __arm64ec__
++	.globl	"#ffi_closure_SYSV"
++	.set	"#ffi_closure_SYSV", ffi_closure_SYSV
++#endif
+ 	FFI_HIDDEN(CNAME(ffi_closure_SYSV))
+ #ifdef __ELF__
+ 	.type	CNAME(ffi_closure_SYSV), #function
+@@ -542,6 +561,10 @@ CNAME(ffi_closure_SYSV_V_alt):
+ 	b	CNAME(ffi_closure_SYSV_V)
+ 
+ 	.globl	CNAME(ffi_closure_SYSV_V_alt)
++#ifdef __arm64ec__
++	.globl	"#ffi_closure_SYSV_V_alt"
++	.set	"#ffi_closure_SYSV_V_alt", ffi_closure_SYSV_V_alt
++#endif
+ 	FFI_HIDDEN(CNAME(ffi_closure_SYSV_V_alt))
+ #ifdef __ELF__
+ 	.type	CNAME(ffi_closure_SYSV_V_alt), #function
+@@ -557,6 +580,10 @@ CNAME(ffi_closure_SYSV_alt):
+ 	b	CNAME(ffi_closure_SYSV)
+ 
+ 	.globl	CNAME(ffi_closure_SYSV_alt)
++#ifdef __arm64ec__
++	.globl	"#ffi_closure_SYSV_alt"
++	.set	"#ffi_closure_SYSV_alt", ffi_closure_SYSV_alt
++#endif
+ 	FFI_HIDDEN(CNAME(ffi_closure_SYSV_alt))
+ #ifdef __ELF__
+ 	.type	CNAME(ffi_closure_SYSV_alt), #function
+@@ -646,6 +673,10 @@ CNAME(ffi_go_closure_SYSV_V):
+ 	cfi_endproc
+ 
+ 	.globl	CNAME(ffi_go_closure_SYSV_V)
++#ifdef __arm64ec__
++	.globl	"#ffi_go_closure_SYSV_V"
++	.set	"#ffi_go_closure_SYSV_V", ffi_go_closure_SYSV_V
++#endif
+ 	FFI_HIDDEN(CNAME(ffi_go_closure_SYSV_V))
+ #ifdef __ELF__
+ 	.type	CNAME(ffi_go_closure_SYSV_V), #function
+@@ -678,6 +709,10 @@ CNAME(ffi_go_closure_SYSV):
+ 	cfi_endproc
+ 
+ 	.globl	CNAME(ffi_go_closure_SYSV)
++#ifdef __arm64ec__
++	.globl	"#ffi_go_closure_SYSV"
++	.set	"#ffi_go_closure_SYSV", ffi_go_closure_SYSV
++#endif
+ 	FFI_HIDDEN(CNAME(ffi_go_closure_SYSV))
+ #ifdef __ELF__
+ 	.type	CNAME(ffi_go_closure_SYSV), #function
+diff --git a/src/dlmalloc.c b/src/dlmalloc.c
+index 93e8196..5a988cc 100644
+--- a/src/dlmalloc.c
++++ b/src/dlmalloc.c
+@@ -1725,15 +1725,43 @@ static int os2munmap(void* ptr, size_t size) {
+ /* Win32 MMAP via VirtualAlloc */
+ /* libffi: plain static (not FORCEINLINE) -- mingw's <windows.h> defines
+    FORCEINLINE with an 'extern' storage class, which clashes with 'static'.  */
++#ifdef __arm64ec__
++/* libffi: closure trampolines are Arm64 code.  An Arm64EC process runs
++   memory that is not marked as EC code under x64 emulation, so allocate
++   it with VirtualAlloc2 and MEM_EXTENDED_PARAMETER_EC_CODE.  */
++typedef PVOID (WINAPI *ffi_VirtualAlloc2_t) (HANDLE, PVOID, SIZE_T, ULONG,
++                                             ULONG, void *, ULONG);
++static void* win32_ec_alloc(size_t size, DWORD type) {
++  static ffi_VirtualAlloc2_t va2;
++  struct { DWORD64 Type_Reserved; DWORD64 ULong64; } param;
++  if (!va2)
++    va2 = (ffi_VirtualAlloc2_t) (void (*) (void))
++      GetProcAddress (GetModuleHandleW (L"kernelbase.dll"), "VirtualAlloc2");
++  if (!va2)
++    return 0;
++  param.Type_Reserved = 5; /* MemExtendedParameterAttributeFlags */
++  param.ULong64 = 0x1;     /* MEM_EXTENDED_PARAMETER_EC_CODE */
++  return va2 (0, 0, size, type, PAGE_EXECUTE_READWRITE, &param, 1);
++}
++#endif
++
+ static void* win32mmap(size_t size) {
++#ifdef __arm64ec__
++  void* ptr = win32_ec_alloc(size, MEM_RESERVE|MEM_COMMIT);
++#else
+   void* ptr = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
++#endif
+   return (ptr != 0)? ptr: MFAIL;
+ }
+ 
+ /* For direct MMAP, use MEM_TOP_DOWN to minimize interference */
+ static void* win32direct_mmap(size_t size) {
++#ifdef __arm64ec__
++  void* ptr = win32_ec_alloc(size, MEM_RESERVE|MEM_COMMIT|MEM_TOP_DOWN);
++#else
+   void* ptr = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT|MEM_TOP_DOWN,
+                            PAGE_EXECUTE_READWRITE);
++#endif
+   return (ptr != 0)? ptr: MFAIL;
+ }
+ 
+diff --git a/src/prep_cif.c b/src/prep_cif.c
+index 8a448eb..b24fea8 100644
+--- a/src/prep_cif.c
++++ b/src/prep_cif.c
+@@ -230,7 +230,7 @@ ffi_status FFI_HIDDEN ffi_prep_cif_core(ffi_cif *cif, ffi_abi abi,
+ #endif
+ 
+   cif->flags = 0;
+-#if (defined(_M_ARM64) || defined(__aarch64__)) && defined(_WIN32)
++#if (defined(_M_ARM64) || defined(__aarch64__) || defined(__arm64ec__)) && defined(_WIN32)
+   cif->is_variadic = isvariadic;
+ #endif
+ #if HAVE_LONG_DOUBLE_VARIANT
+@@ -388,7 +388,8 @@ ffi_get_struct_offsets (ffi_abi abi, ffi_type *struct_type, size_t *offsets)
+    exclude the fallback only when ffi64.c actually provides it; everywhere else
+    this plan just records the cif and invoke calls ffi_call, so the API is
+    always present and links on all targets.  The cif must outlive the plan. */
+-#if !(defined(__x86_64__) && !defined(__ILP32__) && !defined(X86_WIN64))
++#if !(defined(__x86_64__) && !defined(__ILP32__) && !defined(X86_WIN64) \
++      && !defined(__arm64ec__))
+ 
+ struct ffi_call_plan
+ {
