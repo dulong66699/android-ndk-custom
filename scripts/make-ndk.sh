@@ -1030,6 +1030,13 @@ build_python2() {
     if [ ! -x "$BUILD/python2-host/bin/python2.7" ]; then
       rm -rf python2-native; cp -a python2-src python2-native
       ( cd python2-native
+        # Built-in stdlib modules: make install runs this interpreter with the
+        # target's build directory on PYTHONPATH, whose _struct.so & co. it
+        # would otherwise try to load.
+        { echo '*static*'
+          sed -nE 's/^#((array|cmath|math|_struct|time|operator|_random|_collections|_heapq|itertools|strop|_functools|datetime|_bisect|_io|fcntl|select|binascii|cStringIO|cPickle|_md5|_sha|_sha256|_sha512)[[:space:]].*)$/\1/p' Modules/Setup.dist
+        } > Modules/Setup.local
+        sed -i '/^cmath /s/ _math\.c//' Modules/Setup.local
         CC=/usr/bin/cc ./configure --prefix="$BUILD/python2-host" --without-ensurepip
         make -j"$(ncpu)" && make install ) > "$BUILD/python2-host.log" 2>&1 \
         || { tail -40 "$BUILD/python2-host.log" >&2; exit 1; }
@@ -1104,7 +1111,9 @@ build_python2() {
     fi
 
     # build != host even for x86_64-linux-gnu, or setup.py uses this machine's headers.
-    local args=( --prefix="$PWD/build" --build=x86_64-unknown-linux-gnu --host="$TARGET"
+    # our libffi, never the bundled copy (absent on Windows)
+    [ -f "$PYDEPS/lib/libffi.a" ] && export LIBFFI_INCLUDEDIR="$PYDEPS/include"
+    local args=( --prefix="$PWD/build" --build=x86_64-unknown-linux-gnu --host="$TARGET" --with-system-ffi
                  --without-ensurepip --with-threads
                  CONFIG_SITE=config.site PKG_CONFIG=/bin/false
                  CC="$CROSS_CC" CXX="$CROSS_CXX" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB"
@@ -1114,9 +1123,9 @@ build_python2() {
       windows) # as msys2's PKGBUILD; tzset/semaphores/getlogin probes misdetect
                export ac_cv_working_tzset=no ac_cv_posix_semaphores_enabled=no \
                       ac_cv_broken_sem_getvalue=no ac_cv_func_getlogin=no
-               export MSYSTEM=MINGW LIBFFI_INCLUDEDIR="$PYDEPS/include"
+               export MSYSTEM=MINGW
                local laa=""; [ "$TARGET" = i686-w64-mingw32 ] && laa=" -Wl,--large-address-aware"
-               args+=( --enable-shared --with-system-ffi
+               args+=( --enable-shared
                        CFLAGS="-O2 -fwrapv -D__USE_MINGW_ANSI_STDIO=1 -Wno-incompatible-function-pointer-types -Wno-incompatible-pointer-types -Wno-int-conversion -Wno-error=implicit-function-declaration"
                        LDFLAGS="-L$PYDEPS/lib -static-libgcc$laa"
                        WINDRES="$TC/bin/${TARGET}-windres" ) ;;
