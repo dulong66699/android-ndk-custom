@@ -1,12 +1,12 @@
 /*
- * sem_clockwait.h — provide sem_clockwait() on bionic API levels below 30.
+ * sem_clockwait.h -- provide sem_clockwait() on bionic API levels below 30.
  *
  * bionic only declares/exports sem_clockwait() from API 30, but CPython's
  * configure enables HAVE_SEM_CLOCKWAIT and Python/thread_pthread.h calls it
  * unconditionally, so a sub-30 build fails with "call to undeclared function
  * 'sem_clockwait'". This is a genuine implementation, not a fallback: it is a
- * transcription of bionic's own semaphore.cpp — a futex wait over the semaphore
- * counter word — so it gives true CLOCK_MONOTONIC waits identical to API 30+.
+ * transcription of bionic's own semaphore.cpp -- a futex wait over the semaphore
+ * counter word -- so it gives true CLOCK_MONOTONIC waits identical to API 30+.
  *
  * Force-included (via -include) for the bionic Python build; self-gated so it is
  * inert at API >= 30 (where the libc declaration wins) and on non-Android hosts.
@@ -89,7 +89,7 @@ static inline int ndk_sem_clockwait(sem_t *sem, clockid_t clock,
 		if (r != 0) {
 			if (errno == ETIMEDOUT || errno == EINTR)
 				return -1; /* errno already set by the syscall */
-			/* EAGAIN: the word changed before we slept — just retry. */
+			/* EAGAIN: the word changed before we slept -- just retry. */
 		}
 	}
 }

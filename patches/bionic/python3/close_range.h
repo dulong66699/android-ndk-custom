@@ -1,5 +1,5 @@
 /*
- * close_range.h — provide close_range() on bionic API levels below 34.
+ * close_range.h -- provide close_range() on bionic API levels below 34.
  *
  * bionic only declares/exports close_range() from API 34, but CPython's configure
  * enables HAVE_CLOSE_RANGE (the NDK libc stub exports the symbol regardless of

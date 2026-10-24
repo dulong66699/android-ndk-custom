@@ -493,7 +493,7 @@ build_shaderc() {
   git_fetch "$SHADERC_BASE/shaderc" "$SHADERC_REF" "$SH"
   git_fetch "$SHADERC_BASE/spirv-tools" "$SHADERC_REF" "$SH/third_party/spirv-tools"
   # small_vector.h uses std::alignment_of/std::aligned_storage but never includes
-  # <type_traits> — it relied on a transitive include that newer libc++ dropped.
+  # <type_traits>, it relied on a transitive include that newer libc++ dropped.
   sed -i 's|#include <cassert>|#include <cassert>\n#include <type_traits>|' "$SH/third_party/spirv-tools/source/util/small_vector.h"
   if [ "$PLATFORM" = bsd ]; then
     # spirv-tools rejects unknown platforms; downgrade to a warning, assume Linux
@@ -745,7 +745,7 @@ build_python() {
     # sem_clockwait from API 30. Supply an implementation for API < 30 by
     # including it into thread_pthread.h (its only user). It goes here, not via a
     # global -include, because the header pulls system headers and CPython
-    # requires Python.h before any system header — thread_pthread.h is included
+    # requires Python.h before any system header, thread_pthread.h is included
     # well after Python.h, so the ordering stays correct.
     if [ "$PLATFORM" = bionic ]; then
       cp "$ROOT/patches/bionic/python3/sem_clockwait.h" Python/sem_clockwait.h
@@ -775,10 +775,10 @@ build_python() {
       # (fexecve).  Inject the compat header after Python.h in every file that
       # references one of the affected functions.
       lc="$ROOT/patches/bionic/python3/libc_compat.h"
-      for fn in ctermid futimes lutimes fexecve posix_spawn preadv2 pwritev2 copy_file_range getloadavg; do
+      for fn in ctermid futimes lutimes fexecve posix_spawn preadv2 pwritev2 copy_file_range getloadavg shm_open; do
         grep -rl "${fn}(" Python Modules 2>/dev/null | while IFS= read -r f; do
           grep -qF "$lc" "$f" && continue
-          sed -i "s|#include \"Python.h\"|#include \"Python.h\"\n#include \"$lc\"|" "$f"
+          sed -i -E "s|#include [<\"]Python.h[>\"]|&\n#include \"$lc\"|" "$f"
         done
       done
     fi
@@ -826,7 +826,8 @@ ac_cv_file__dev_ptmx=no
 ac_cv_file__dev_ptc=no
 EOF
     fi
-    [ "$PLATFORM" = bionic ] && printf 'ac_cv_header_spawn_h=no\n' >> config.site
+    # spwd, _posixshmem: shadow.h and shm_open/shm_unlink come from our shims.
+    [ "$PLATFORM" = bionic ] && printf '%s\n' ac_cv_header_spawn_h=no ac_cv_header_shadow_h=yes ac_cv_func_getspnam=yes ac_cv_func_getspent=yes "ac_cv_search_shm_open='none required'" ac_cv_func_shm_open=yes ac_cv_func_shm_unlink=yes >> config.site
     # macos: configure defines HAVE_SENDFILE, but the prototype is hidden without
     # _DARWIN_C_SOURCE; mkfifoat/mknodat pull in compiler-rt availability checks.
     # Host tools need none, so disable all three.
@@ -921,7 +922,7 @@ MODULE_BUILDTYPE=static
     # CPPFLAGS -I and LDFLAGS -L. The -L is already there; supply the -I.
     # bionic: some NDK kernel headers (r28-beta2 asm/swab.h) use plain asm(),
     # which is not a keyword under CPython's -std=c11.
-    local py_cpp="-I$PYDEPS/include"; [ "$PLATFORM" = bionic ] && py_cpp="$py_cpp -Dasm=__asm__"
+    local py_cpp="-I$PYDEPS/include"; [ "$PLATFORM" = bionic ] && py_cpp="$py_cpp -I$ROOT/patches/bionic/python3/include -Dasm=__asm__"
     args+=( CPPFLAGS="$py_cpp" )
     case "$PLATFORM" in
       bionic) # grp/pwd n/a below API 26.
@@ -1094,7 +1095,8 @@ build_python2() {
       } > Modules/Setup.local
       sed -i -e '/^cmath /s/ _math\.c//' -e 's/-DXML_POOR_ENTROPY=1/-DXML_POOR_ENTROPY/' Modules/Setup.local
       if [ "$PLATFORM" = bionic ]; then
-        sed -i '/^spwd /d; /^crypt /d' Modules/Setup.local
+        sed -i '/^crypt /d' Modules/Setup.local
+        printf 'ac_cv_header_shadow_h=yes\nac_cv_func_getspnam=yes\nac_cv_func_getspent=yes\n' >> config.site
         # getgrent() & co. and nl_langinfo() arrived in API 26.
         if [ "$API" -lt 26 ]; then
           sed -i '/^grp /d' Modules/Setup.local
@@ -1143,7 +1145,7 @@ build_python2() {
                  printf '%s\n' 'LIBC_N { };' > "$ndk_vs"
                  ndk_vs="-Wl,--version-script=$ndk_vs"
                esac
-               args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -Dasm=__asm__"
+               args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -Dasm=__asm__ -I$ROOT/patches/bionic/python3/include"
                        LDFLAGS="-L$PYDEPS/lib -static $ndk_vs $BIONIC_EXE_LDFLAGS" ) ;;
     esac
     ./configure "${args[@]}"

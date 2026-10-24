@@ -15,8 +15,8 @@
 #ifndef NDK_BIONIC_LIBC_COMPAT_H
 #define NDK_BIONIC_LIBC_COMPAT_H
 
-/* close_range   — syscall-backed, API < 34  (already injected separately) */
-/* sem_clockwait — futex-backed,  API < 30  (injected into thread_pthread.h) */
+/* close_range   -- syscall-backed, API < 34  (already injected separately) */
+/* sem_clockwait -- futex-backed,  API < 30  (injected into thread_pthread.h) */
 
 #include "ctermid.h"         /* ctermid,           never in bionic              */
 #include "futimes.h"         /* futimes,           API < 26 (via futimens)      */
@@ -26,5 +26,6 @@
 #include "preadv2.h"         /* preadv2/pwritev2,  API < 24 or hidden by FTM   */
 #include "copy_file_range.h" /* copy_file_range,   API < 30 (via syscall)      */
 #include "getloadavg.h"      /* getloadavg,        never in bionic              */
+#include "posix_shm.h"       /* shm_open/shm_unlink, never in bionic        */
 
 #endif /* NDK_BIONIC_LIBC_COMPAT_H */
