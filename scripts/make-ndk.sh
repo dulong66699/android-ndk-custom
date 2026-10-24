@@ -428,10 +428,11 @@ build_make() {
                  CC="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     case "$PLATFORM" in
       # --disable-load: static bionic libdl lacks dlerror/dlclose on older NDKs.
-      bionic)  args+=( --disable-posix-spawn --disable-load
+      bionic)  local uv=""; [ "$NDK_VERSION" -ge 23 ] && uv="-Wl,--undefined-version"
+               args+=( --disable-posix-spawn --disable-load
                        CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration"
-                      LDFLAGS="-static $([ "$NDK_VERSION" -ge 23 ] && echo -Wl,--undefined-version) $BIONIC_EXE_LDFLAGS"
+                      LDFLAGS="-static $uv $BIONIC_EXE_LDFLAGS"
                        ac_cv_lib_elf_elf_begin=no am_cv_func_iconv=no ac_cv_func_pselect=yes ) ;;
       linux)   args+=( CFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
                        CXXFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
@@ -1021,7 +1022,7 @@ MODULE_BUILDTYPE=static
     fi
     # bsd: the modules are dlopen()ed against the interpreter's own symbols.
     # (capture first: grep -q in the pipe would trip pipefail via SIGPIPE)
-    if [ "$PLATFORM" = bsd ] && ! grep -q ' PyModule_Create2$' <<<"$("$NDK_READELF" --dyn-symbols -W python)"; then
+    if [ "$PLATFORM" = bsd ] && ! grep -qw PyModule_Create2 <<<"$("$NDK_READELF" --dyn-symbols -W python)"; then
       echo "python: interpreter does not export the C API (LINKFORSHARED); lib-dynload modules would not load" >&2
       exit 1
     fi
