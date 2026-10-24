@@ -284,6 +284,9 @@ setup_toolchain() {
       mkdir -p "$BUILD/bin"
       [ -x "$CROSS_RANLIB" ] || { ln -sf "$TC/bin/llvm-ar" "$BUILD/bin/llvm-ranlib"; CROSS_RANLIB="$BUILD/bin/llvm-ranlib"; }
       [ -x "$CROSS_STRIP" ] || { ln -sf "$TC/bin/llvm-objcopy" "$BUILD/bin/llvm-strip"; CROSS_STRIP="$BUILD/bin/llvm-strip"; }
+      # r20's llvm-strip (LLVM 8) rejects SHN_XINDEX symbols in our large static
+      # executables; the image's GNU strip handles them via its generic ELF targets.
+      [ "$NDK_VERSION" -lt 21 ] && [ -x /usr/bin/strip ] && CROSS_STRIP=/usr/bin/strip
       [ -x "$CROSS_LD" ] || CROSS_LD="$TC/bin/ld.lld"
       NDK_HOST=linux-x86_64
       CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384"
@@ -457,7 +460,7 @@ build_make() {
       windows) args+=( CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration" ) ;;
     esac
-    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
+    ./configure "${args[@]}" || { grep -E -B2 -A6 'error|undefined' config.log | tail -n 120 >&2; exit 1; }
     make -j"$(ncpu)" install
   )
 }
@@ -484,7 +487,7 @@ build_yasm() {
       windows) args+=( CFLAGS="-Wno-error=implicit-function-declaration -fwrapv -Wno-error=date-time"
                        CXXFLAGS="-Wno-error=implicit-function-declaration -fwrapv -Wno-error=date-time" ) ;;
     esac
-    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
+    ./configure "${args[@]}" || { grep -E -B2 -A6 'error|undefined' config.log | tail -n 120 >&2; exit 1; }
     case "$PLATFORM" in
       windows)
         make -j"$(ncpu)" install
@@ -998,7 +1001,7 @@ MODULE_BUILDTYPE=static
                        LDSHARED="$CROSS_CC -shared"
                        WINDRES="$TC/bin/${TARGET}-windres" ) ;;
     esac
-    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
+    ./configure "${args[@]}" || { grep -E -B2 -A6 'error|undefined' config.log | tail -n 120 >&2; exit 1; }
     # windows: sharedmods links .pyd against -lpython3.11 but doesn't depend on
     # the import lib, so under -j it races. Build the DLL (and its import lib)
     # first.
@@ -1169,7 +1172,7 @@ build_python2() {
                args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -Dasm=__asm__"
                        LDFLAGS="-L$PYDEPS/lib -static $ndk_vs $BIONIC_EXE_LDFLAGS" ) ;;
     esac
-    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
+    ./configure "${args[@]}" || { grep -E -B2 -A6 'error|undefined' config.log | tail -n 120 >&2; exit 1; }
     make -j"$(ncpu)" 2>&1 | tee build_all.log
     [ "${PIPESTATUS[0]}" = 0 ] || exit 1
     if [ "$PLATFORM" = windows ]; then
