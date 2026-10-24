@@ -299,6 +299,8 @@ setup_toolchain() {
       # left it at 8 bytes), so link our own copy in. No-op elsewhere.
       "$CROSS_CC" -c "$ROOT/patches/bionic/tls_align.S" -o "$BUILD/bionic_tls_align.o"
       BIONIC_EXE_LDFLAGS="$BIONIC_EXE_LDFLAGS $BUILD/bionic_tls_align.o"
+      # r21 and older default to GNU ld on some arches; use lld like r22+.
+      [ "$NDK_VERSION" -lt 22 ] && BIONIC_EXE_LDFLAGS="-fuse-ld=lld $BIONIC_EXE_LDFLAGS"
       ;;
     linux)
       TC=/opt/zig-as-llvm; export ZIG_TARGET="$TARGET"
@@ -429,7 +431,7 @@ build_make() {
       bionic)  args+=( --disable-posix-spawn --disable-load
                        CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration"
-                      LDFLAGS="-static -Wl,--undefined-version $BIONIC_EXE_LDFLAGS"
+                      LDFLAGS="-static $([ "$NDK_VERSION" -ge 23 ] && echo -Wl,--undefined-version) $BIONIC_EXE_LDFLAGS"
                        ac_cv_lib_elf_elf_begin=no am_cv_func_iconv=no ac_cv_func_pselect=yes ) ;;
       linux)   args+=( CFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
                        CXXFLAGS="-O2 -Wno-error=incompatible-pointer-types $CROSS_CFLAGS"
@@ -454,7 +456,7 @@ build_make() {
       windows) args+=( CFLAGS="-O2 -Wno-error=implicit-function-declaration"
                        CXXFLAGS="-O2 -Wno-error=implicit-function-declaration" ) ;;
     esac
-    ./configure "${args[@]}"
+    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
     make -j"$(ncpu)" install
   )
 }
@@ -481,7 +483,7 @@ build_yasm() {
       windows) args+=( CFLAGS="-Wno-error=implicit-function-declaration -fwrapv -Wno-error=date-time"
                        CXXFLAGS="-Wno-error=implicit-function-declaration -fwrapv -Wno-error=date-time" ) ;;
     esac
-    ./configure "${args[@]}"
+    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
     case "$PLATFORM" in
       windows)
         make -j"$(ncpu)" install
@@ -546,7 +548,7 @@ build_shaderc() {
     -e "s/mode='rU'/mode='r'/"
   sed -i '/void setAllocator(TPoolAllocator\* a) { allocator = \*a; }/d' "$SH/third_party/glslang/glslang/Include/PoolAlloc.h"
   # old glslang: FreeBSD's cdefs.h defines __fastcall, which riscv64 rejects.
-  [ "$PLATFORM" != windows ] && sed -i 's/ __fastcall / /' "$SH/third_party/glslang/glslang/Public/ShaderLang.h"
+  [ "$PLATFORM" != windows ] && sed -i 's/ __fastcall / /' "$SH/third_party/glslang/glslang/Public/ShaderLang.h" "$SH/third_party/glslang/glslang/MachineIndependent/ShaderLang.cpp"
   # big-endian hosts: glslc writes the SPIR-V words in host byte order, but
   # .spv files are little-endian (Android/Vulkan load them as LE words, and
   # official glslc only runs on LE hosts). Byte-swap binary output there.
@@ -995,7 +997,7 @@ MODULE_BUILDTYPE=static
                        LDSHARED="$CROSS_CC -shared"
                        WINDRES="$TC/bin/${TARGET}-windres" ) ;;
     esac
-    ./configure "${args[@]}"
+    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
     # windows: sharedmods links .pyd against -lpython3.11 but doesn't depend on
     # the import lib, so under -j it races. Build the DLL (and its import lib)
     # first.
@@ -1019,7 +1021,7 @@ MODULE_BUILDTYPE=static
     fi
     # bsd: the modules are dlopen()ed against the interpreter's own symbols.
     # (capture first: grep -q in the pipe would trip pipefail via SIGPIPE)
-    if [ "$PLATFORM" = bsd ] && ! grep -q ' PyModule_Create2$' <<<"$("$NDK_READELF" --dyn-syms -W python)"; then
+    if [ "$PLATFORM" = bsd ] && ! grep -q ' PyModule_Create2$' <<<"$("$NDK_READELF" --dyn-symbols -W python)"; then
       echo "python: interpreter does not export the C API (LINKFORSHARED); lib-dynload modules would not load" >&2
       exit 1
     fi
@@ -1113,6 +1115,8 @@ build_python2() {
       sed -i -e '/^cmath /s/ _math\.c//' -e 's/-DXML_POOR_ENTROPY=1/-DXML_POOR_ENTROPY/' Modules/Setup.local
       if [ "$PLATFORM" = bionic ]; then
         sed -i '/^spwd /d; /^crypt /d' Modules/Setup.local
+        # r21 and older: ftime links but sys/timeb.h is gone.
+        echo ac_cv_func_ftime=no >> config.site
         # getgrent() & co. and nl_langinfo() arrived in API 26.
         if [ "$API" -lt 26 ]; then
           sed -i '/^grp /d' Modules/Setup.local
@@ -1164,7 +1168,7 @@ build_python2() {
                args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -Dasm=__asm__"
                        LDFLAGS="-L$PYDEPS/lib -static $ndk_vs $BIONIC_EXE_LDFLAGS" ) ;;
     esac
-    ./configure "${args[@]}"
+    ./configure "${args[@]}" || { tail -n 80 config.log >&2; exit 1; }
     make -j"$(ncpu)" 2>&1 | tee build_all.log
     [ "${PIPESTATUS[0]}" = 0 ] || exit 1
     if [ "$PLATFORM" = windows ]; then
