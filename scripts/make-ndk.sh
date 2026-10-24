@@ -826,8 +826,8 @@ ac_cv_file__dev_ptmx=no
 ac_cv_file__dev_ptc=no
 EOF
     fi
-    # spwd, _posixshmem: shadow.h and shm_open/shm_unlink come from our shims.
-    [ "$PLATFORM" = bionic ] && printf '%s\n' ac_cv_header_spawn_h=no ac_cv_header_shadow_h=yes ac_cv_func_getspnam=yes ac_cv_func_getspent=yes "ac_cv_search_shm_open='none required'" ac_cv_func_shm_open=yes ac_cv_func_shm_unlink=yes >> config.site
+    # _posixshmem: shm_open/shm_unlink come from our shim.
+    [ "$PLATFORM" = bionic ] && printf '%s\n' ac_cv_header_spawn_h=no "ac_cv_search_shm_open='none required'" ac_cv_func_shm_open=yes ac_cv_func_shm_unlink=yes >> config.site
     # macos: configure defines HAVE_SENDFILE, but the prototype is hidden without
     # _DARWIN_C_SOURCE; mkfifoat/mknodat pull in compiler-rt availability checks.
     # Host tools need none, so disable all three.
@@ -922,7 +922,7 @@ MODULE_BUILDTYPE=static
     # CPPFLAGS -I and LDFLAGS -L. The -L is already there; supply the -I.
     # bionic: some NDK kernel headers (r28-beta2 asm/swab.h) use plain asm(),
     # which is not a keyword under CPython's -std=c11.
-    local py_cpp="-I$PYDEPS/include"; [ "$PLATFORM" = bionic ] && py_cpp="$py_cpp -I$ROOT/patches/bionic/python3/include -Dasm=__asm__"
+    local py_cpp="-I$PYDEPS/include"; [ "$PLATFORM" = bionic ] && py_cpp="$py_cpp -Dasm=__asm__"
     args+=( CPPFLAGS="$py_cpp" )
     case "$PLATFORM" in
       bionic) # grp/pwd n/a below API 26.
@@ -1095,8 +1095,7 @@ build_python2() {
       } > Modules/Setup.local
       sed -i -e '/^cmath /s/ _math\.c//' -e 's/-DXML_POOR_ENTROPY=1/-DXML_POOR_ENTROPY/' Modules/Setup.local
       if [ "$PLATFORM" = bionic ]; then
-        sed -i '/^crypt /d' Modules/Setup.local
-        printf 'ac_cv_header_shadow_h=yes\nac_cv_func_getspnam=yes\nac_cv_func_getspent=yes\n' >> config.site
+        sed -i '/^spwd /d; /^crypt /d' Modules/Setup.local
         # getgrent() & co. and nl_langinfo() arrived in API 26.
         if [ "$API" -lt 26 ]; then
           sed -i '/^grp /d' Modules/Setup.local
@@ -1145,7 +1144,7 @@ build_python2() {
                  printf '%s\n' 'LIBC_N { };' > "$ndk_vs"
                  ndk_vs="-Wl,--version-script=$ndk_vs"
                esac
-               args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -Dasm=__asm__ -I$ROOT/patches/bionic/python3/include"
+               args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -Dasm=__asm__"
                        LDFLAGS="-L$PYDEPS/lib -static $ndk_vs $BIONIC_EXE_LDFLAGS" ) ;;
     esac
     ./configure "${args[@]}"
