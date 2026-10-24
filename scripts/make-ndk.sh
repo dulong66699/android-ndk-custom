@@ -284,9 +284,6 @@ setup_toolchain() {
       mkdir -p "$BUILD/bin"
       [ -x "$CROSS_RANLIB" ] || { ln -sf "$TC/bin/llvm-ar" "$BUILD/bin/llvm-ranlib"; CROSS_RANLIB="$BUILD/bin/llvm-ranlib"; }
       [ -x "$CROSS_STRIP" ] || { ln -sf "$TC/bin/llvm-objcopy" "$BUILD/bin/llvm-strip"; CROSS_STRIP="$BUILD/bin/llvm-strip"; }
-      # r20's llvm-strip (LLVM 8) rejects SHN_XINDEX symbols in our large static
-      # executables; the image's GNU strip handles them via its generic ELF targets.
-      [ "$NDK_VERSION" -lt 21 ] && [ -x /usr/bin/strip ] && CROSS_STRIP=/usr/bin/strip
       [ -x "$CROSS_LD" ] || CROSS_LD="$TC/bin/ld.lld"
       NDK_HOST=linux-x86_64
       CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384"
@@ -302,8 +299,9 @@ setup_toolchain() {
       # left it at 8 bytes), so link our own copy in. No-op elsewhere.
       "$CROSS_CC" -c "$ROOT/patches/bionic/tls_align.S" -o "$BUILD/bionic_tls_align.o"
       BIONIC_EXE_LDFLAGS="$BIONIC_EXE_LDFLAGS $BUILD/bionic_tls_align.o"
-      # r21 and older default to GNU ld on some arches; use lld like r22+.
-      [ "$NDK_VERSION" -lt 22 ] && BIONIC_EXE_LDFLAGS="-fuse-ld=lld $BIONIC_EXE_LDFLAGS"
+      # r21 defaults to GNU ld on some arches; use lld like r22+. Not on r20:
+      # lld 8 emits broken SHN_XINDEX symbols and lacks --fix-cortex-a8.
+      [ "$NDK_VERSION" = 21 ] && BIONIC_EXE_LDFLAGS="-fuse-ld=lld $BIONIC_EXE_LDFLAGS"
       ;;
     linux)
       TC=/opt/zig-as-llvm; export ZIG_TARGET="$TARGET"
