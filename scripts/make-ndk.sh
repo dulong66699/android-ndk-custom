@@ -191,13 +191,15 @@ strip_debugger() {
 download_official_ndk() {
   local base="https://dl.google.com/android/repository/${NDK_NAME}"
   log "Downloading official NDK (linux)"
-  fetch_unpack "${base}-linux.zip" "$BUILD/ndk-linux.zip" "$BUILD/ndk-linux"
+  # r22 and older name the archives -<os>-x86_64.zip.
+  local sfx=""; [ "$NDK_VERSION" -lt 23 ] && sfx="-x86_64"
+  fetch_unpack "${base}-linux$sfx.zip" "$BUILD/ndk-linux.zip" "$BUILD/ndk-linux"
   LINUX_NDK="$(ndk_dir_in "$BUILD/ndk-linux")"
   NDK_LLVM_BIN="$LINUX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
   if [ "$PLATFORM" = windows ]; then
     log "Downloading official NDK (windows)"
-    fetch_unpack "${base}-windows.zip" "$BUILD/ndk-windows.zip" "$ROOTDIR/ndk-windows"
+    fetch_unpack "${base}-windows$sfx.zip" "$BUILD/ndk-windows.zip" "$ROOTDIR/ndk-windows"
     NDK="$(ndk_dir_in "$ROOTDIR/ndk-windows")"
   else
     NDK="$LINUX_NDK"
@@ -551,15 +553,17 @@ build_shaderc() {
   grep -q '__ORDER_BIG_ENDIAN__' "$fc" \
     || { echo "glslc: binary output write not found in file_compiler.cc" >&2; exit 1; }
 
-  local cflags="" exelink=""
+  local cflags="" exelink="" shlink=unset
   case "$PLATFORM" in
-    bionic)  exelink="-static $BIONIC_EXE_LDFLAGS" ;;
+    # bionic: pre-r24 trees still build -shared libraries, which -static breaks.
+    bionic)  exelink="-static $BIONIC_EXE_LDFLAGS"; shlink="" ;;
     linux)    exelink="$CROSS_LDFLAGS"; cflags="$CROSS_CFLAGS"
              [ "$TARGET" = hexagon-linux-musl ] && cflags="-Wno-bitfield-width -Wno-error=bitfield-width $CROSS_CFLAGS" ;;
     bsd)     cflags="-Wno-error=date-time $CROSS_CFLAGS"; exelink="$CROSS_LDFLAGS" ;;
     macos)   cflags="-Wno-error=date-time $CROSS_CFLAGS"; exelink="$CROSS_LDFLAGS" ;;
     windows) exelink="-static-libstdc++ -static-libgcc -pthread"; cflags="-Wno-error=implicit-function-declaration" ;;
   esac
+  [ "$shlink" = unset ] && shlink="$exelink"
   # pass CMAKE_OBJCOPY only when the toolchain has one (empty on macos).
   # -fno-rtti/-fno-exceptions match the NDK's own shaderc build, but on the C++
   # flags only: it puts them in both and then needs
@@ -569,7 +573,7 @@ build_shaderc() {
     -DCMAKE_INSTALL_PREFIX="$SH/install" \
     -DCMAKE_BUILD_TYPE=MinSizeRel \
     -DCMAKE_C_FLAGS="$cflags" -DCMAKE_CXX_FLAGS="$cflags -fno-rtti -fno-exceptions" \
-    -DCMAKE_EXE_LINKER_FLAGS="$exelink" -DCMAKE_SHARED_LINKER_FLAGS="$exelink" \
+    -DCMAKE_EXE_LINKER_FLAGS="$exelink" -DCMAKE_SHARED_LINKER_FLAGS="$shlink" \
     -DCMAKE_CROSSCOMPILING=True -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
     -DCMAKE_C_COMPILER="$CROSS_CC" -DCMAKE_CXX_COMPILER="$CROSS_CXX" -DCMAKE_ASM_COMPILER="$CROSS_CC" \
     -DCMAKE_LINKER="$CROSS_LD" ${CROSS_OBJCOPY:+-DCMAKE_OBJCOPY="$CROSS_OBJCOPY"} -DCMAKE_AR="$CROSS_AR" \
