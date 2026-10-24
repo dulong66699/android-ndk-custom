@@ -14,19 +14,23 @@
  * object on the architectures/API levels that don't need it.
  *
  * The .reloc keeps .tdata alive if anything ever links with --gc-sections,
- * matching what crtbegin does.
+ * matching what crtbegin does. Older clang (r20-r22) rejects or mislinks it.
  */
 #if __ANDROID_API__ < 29
 #if defined(__arm__)
 .section .tdata, "awT", %progbits
 .p2align 5
 .text
+#if __clang_major__ >= 12
 .reloc 0, R_ARM_NONE, .tdata
+#endif
 #elif defined(__aarch64__)
 .section .tdata, "awT", @progbits
 .p2align 6
 .text
+#if __clang_major__ >= 12
 .reloc 0, R_AARCH64_NONE, .tdata
+#endif
 #endif
 #endif
 

@@ -196,6 +196,12 @@ download_official_ndk() {
   fetch_unpack "${base}-linux$sfx.zip" "$BUILD/ndk-linux.zip" "$BUILD/ndk-linux"
   LINUX_NDK="$(ndk_dir_in "$BUILD/ndk-linux")"
   NDK_LLVM_BIN="$LINUX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+  # r20 and older ship llvm-readobj only; it acts as readelf under that name.
+  NDK_READELF="$NDK_LLVM_BIN/llvm-readelf"
+  if [ ! -x "$NDK_READELF" ]; then
+    mkdir -p "$BUILD/bin"; ln -sf "$NDK_LLVM_BIN/llvm-readobj" "$BUILD/bin/llvm-readelf"
+    NDK_READELF="$BUILD/bin/llvm-readelf"
+  fi
 
   if [ "$PLATFORM" = windows ]; then
     log "Downloading official NDK (windows)"
@@ -274,6 +280,11 @@ setup_toolchain() {
       CROSS_CC="$TC/bin/${TARGET}${API}-clang"; CROSS_CXX="${CROSS_CC}++"
       CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
       CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
+      # r20/r21 lack some of these; the LLVM multi-tools act by argv[0].
+      mkdir -p "$BUILD/bin"
+      [ -x "$CROSS_RANLIB" ] || { ln -sf "$TC/bin/llvm-ar" "$BUILD/bin/llvm-ranlib"; CROSS_RANLIB="$BUILD/bin/llvm-ranlib"; }
+      [ -x "$CROSS_STRIP" ] || { ln -sf "$TC/bin/llvm-objcopy" "$BUILD/bin/llvm-strip"; CROSS_STRIP="$BUILD/bin/llvm-strip"; }
+      [ -x "$CROSS_LD" ] || CROSS_LD="$TC/bin/ld.lld"
       NDK_HOST=linux-x86_64
       CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384"
       # Pre-4.14 kernels reject MADV_WIPEONFORK with EINVAL, and newer bionic's
@@ -534,6 +545,8 @@ build_shaderc() {
     -e 's/distutils\.dir_util\.mkpath(\(.*\))$/os.makedirs(\1, exist_ok=True)/' \
     -e "s/mode='rU'/mode='r'/"
   sed -i '/void setAllocator(TPoolAllocator\* a) { allocator = \*a; }/d' "$SH/third_party/glslang/glslang/Include/PoolAlloc.h"
+  # old glslang: FreeBSD's cdefs.h defines __fastcall, which riscv64 rejects.
+  [ "$PLATFORM" != windows ] && sed -i 's/ __fastcall / /' "$SH/third_party/glslang/glslang/Public/ShaderLang.h"
   # big-endian hosts: glslc writes the SPIR-V words in host byte order, but
   # .spv files are little-endian (Android/Vulkan load them as LE words, and
   # official glslc only runs on LE hosts). Byte-swap binary output there.
@@ -779,7 +792,7 @@ build_python() {
       # (fexecve).  Inject the compat header after Python.h in every file that
       # references one of the affected functions.
       lc="$ROOT/patches/bionic/python3/libc_compat.h"
-      for fn in ctermid futimes lutimes fexecve posix_spawn preadv2 pwritev2 copy_file_range getloadavg shm_open; do
+      for fn in ctermid futimes lutimes fexecve posix_spawn preadv2 pwritev2 copy_file_range getloadavg shm_open wait3; do
         grep -rl "${fn}(" Python Modules 2>/dev/null | while IFS= read -r f; do
           grep -qF "$lc" "$f" && continue
           sed -i -E "s|#include [<\"]Python.h[>\"]|&\n#include \"$lc\"|" "$f"
@@ -902,7 +915,7 @@ MODULE_BUILDTYPE=static
                  --with-build-python --without-ensurepip
                  CONFIG_SITE=config.site TARGET="$TARGET" PKG_CONFIG=/bin/false
                  CC="$CROSS_CC" AS="$CROSS_CC" CXX="$CROSS_CXX" LD="$CROSS_LD" OBJCOPY="$CROSS_OBJCOPY"
-                 READELF="$NDK_LLVM_BIN/llvm-readelf" LLVM_PROFDATA="$NDK_LLVM_BIN/llvm-profdata"
+                 READELF="$NDK_READELF" LLVM_PROFDATA="$NDK_LLVM_BIN/llvm-profdata"
                  AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" )
     # mingw is a shared build (libpython3.11.dll); every other host is static.
     if [ "$PLATFORM" != windows ]; then
@@ -1006,7 +1019,7 @@ MODULE_BUILDTYPE=static
     fi
     # bsd: the modules are dlopen()ed against the interpreter's own symbols.
     # (capture first: grep -q in the pipe would trip pipefail via SIGPIPE)
-    if [ "$PLATFORM" = bsd ] && ! grep -q ' PyModule_Create2$' <<<"$("$NDK_LLVM_BIN/llvm-readelf" --dyn-syms -W python)"; then
+    if [ "$PLATFORM" = bsd ] && ! grep -q ' PyModule_Create2$' <<<"$("$NDK_READELF" --dyn-syms -W python)"; then
       echo "python: interpreter does not export the C API (LINKFORSHARED); lib-dynload modules would not load" >&2
       exit 1
     fi
@@ -1116,7 +1129,7 @@ build_python2() {
                  --without-ensurepip --with-threads
                  CONFIG_SITE=config.site PKG_CONFIG=/bin/false
                  CC="$CROSS_CC" CXX="$CROSS_CXX" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB"
-                 STRIP="$CROSS_STRIP" READELF="$NDK_LLVM_BIN/llvm-readelf"
+                 STRIP="$CROSS_STRIP" READELF="$NDK_READELF"
                  CPPFLAGS="-I$PYDEPS/include" )
     case "$PLATFORM" in
       windows) # as msys2's PKGBUILD; tzset/semaphores/getlogin probes misdetect

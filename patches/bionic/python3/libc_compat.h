@@ -27,5 +27,6 @@
 #include "copy_file_range.h" /* copy_file_range,   API < 30 (via syscall)      */
 #include "getloadavg.h"      /* getloadavg,        never in bionic              */
 #include "posix_shm.h"       /* shm_open/shm_unlink, never in bionic        */
+#include "wait3.h"           /* wait3,             undeclared in older NDKs     */
 
 #endif /* NDK_BIONIC_LIBC_COMPAT_H */
