@@ -191,8 +191,9 @@ strip_debugger() {
 download_official_ndk() {
   local base="https://dl.google.com/android/repository/${NDK_NAME}"
   log "Downloading official NDK (linux)"
-  # r22 and older name the archives -<os>-x86_64.zip.
-  local sfx=""; [ "$NDK_VERSION" -lt 23 ] && sfx="-x86_64"
+  # r22 through r23-beta4 name the archives -<os>-x86_64.zip.
+  local sfx=""
+  aria2c -q --dry-run=true --check-certificate=false --max-tries=3 "${base}-linux.zip" || sfx="-x86_64"
   fetch_unpack "${base}-linux$sfx.zip" "$BUILD/ndk-linux.zip" "$BUILD/ndk-linux"
   LINUX_NDK="$(ndk_dir_in "$BUILD/ndk-linux")"
   NDK_LLVM_BIN="$LINUX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
