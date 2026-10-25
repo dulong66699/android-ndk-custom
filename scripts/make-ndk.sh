@@ -542,8 +542,14 @@ build_shaderc() {
       fi
       ;;
   esac
-  [ "$NDK_VERSION" -ge 24 ] && ( cd "$SH/third_party/spirv-tools" && git init --quiet && git apply "$ROOT/patches/ndk/spirv/full_static.patch" && rm -rf .git )
-  [ "$NDK_VERSION" -ge 23 ] && ( cd "$SH" && git init --quiet && git apply "$ROOT/patches/ndk/shaderc/full_static.patch" && rm -rf .git )
+  # full_static: spirv r24+, shaderc r23+, and only where it applies (r24-beta1's
+  # spirv-tools predates it). Without it the shared libraries still build.
+  local d p v
+  for d in "24:third_party/spirv-tools:spirv" "23::shaderc"; do
+    v="${d%%:*}"; d="${d#*:}"; p="$ROOT/patches/ndk/${d#*:}/full_static.patch"
+    [ "$NDK_VERSION" -ge "$v" ] || continue
+    ( cd "$SH/${d%%:*}" && git init --quiet && { git apply --check "$p" 2>/dev/null && git apply "$p" || true; } && rm -rf .git )
+  done
   grep -rlE "distutils|'rU'" --include='*.py' "$SH/third_party" | xargs -r sed -i \
     -e 's/^import distutils\.dir_util$/import os/' \
     -e 's/distutils\.dir_util\.mkpath(\(.*\))$/os.makedirs(\1, exist_ok=True)/' \
