@@ -300,9 +300,16 @@ setup_toolchain() {
       # left it at 8 bytes), so link our own copy in. No-op elsewhere.
       "$CROSS_CC" -c "$ROOT/patches/bionic/tls_align.S" -o "$BUILD/bionic_tls_align.o"
       BIONIC_EXE_LDFLAGS="$BIONIC_EXE_LDFLAGS $BUILD/bionic_tls_align.o"
-      # r21 defaults to GNU ld on some arches; use lld like r22+. Not on r20:
-      # lld 8 emits broken SHN_XINDEX symbols and lacks --fix-cortex-a8.
-      [ "$NDK_VERSION" = 21 ] && BIONIC_EXE_LDFLAGS="-fuse-ld=lld $BIONIC_EXE_LDFLAGS"
+      # r21 defaults to GNU ld on some arches; use lld like r22+. Not on r20
+      # (lld 8 emits broken SHN_XINDEX symbols), nor for armv7 where lld lacks
+      # --fix-cortex-a8 (r21 itself), which clang passes there.
+      if [ "$NDK_VERSION" = 21 ]; then
+        case "$TARGET" in
+          arm*) "$TC/bin/ld.lld" --help 2>/dev/null | grep -q fix-cortex-a8 \
+                  && BIONIC_EXE_LDFLAGS="-fuse-ld=lld $BIONIC_EXE_LDFLAGS" ;;
+          *)    BIONIC_EXE_LDFLAGS="-fuse-ld=lld $BIONIC_EXE_LDFLAGS" ;;
+        esac
+      fi
       ;;
     linux)
       TC=/opt/zig-as-llvm; export ZIG_TARGET="$TARGET"
