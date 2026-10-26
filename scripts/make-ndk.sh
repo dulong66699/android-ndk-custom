@@ -1271,7 +1271,7 @@ assemble_unix() {
     fi
   done
 
-  sed -i 's,#!/usr/bin/env bash,#!/usr/bin/env sh,' "$NDK/build/tools/ndk_bin_common.sh" "$NDK/build/tools/make_standalone_toolchain.py" "$NDK/build/ndk-build"
+  sed -i 's,#!/usr/bin/env bash,#!/usr/bin/env sh,' $(ls -d "$NDK/build/tools/ndk_bin_common.sh" "$NDK/build/tools/make_standalone_toolchain.py" "$NDK/build/ndk-build" 2>/dev/null)
   sed -i 's,#!/bin/bash,#!/bin/sh,' "$PREBUILT_BIN/ndk-stack" "$PREBUILT_BIN/ndk-which"
   cp "$ROOT/patches/ndk/scripts/clang-tidy.sh" "$NDK_TOOLCHAIN/bin"
   cp "$ROOT/patches/ndk/scripts/ndk-which" "$PREBUILT_BIN"
@@ -1293,13 +1293,9 @@ assemble_unix() {
   rm -rf "$NDK_TOOLCHAIN/python3"
   rm -rf "$NDK_TOOLCHAIN/musl"
   rm -rf "$NDK/simpleperf"                 # can't build simpleperf as it requires AOSP sources
-  find "$NDK_TOOLCHAIN/lib" -maxdepth 1 -mindepth 1 -not -name clang -exec rm -rf {} \;
-  find "$NDK_TOOLCHAIN" -maxdepth 5 -path "*/lib/clang/[0-9][0-9]/lib/*" -not -name linux -exec rm -rf {} \;
 
   # copy compiled binaries
-  cp -R "$HOST_TOOLCHAIN/lib/clang" "$NDK_TOOLCHAIN/lib"
-  cp -R "$HOST_TOOLCHAIN/lib/libear" "$NDK_TOOLCHAIN/lib"
-  cp -R "$HOST_TOOLCHAIN/lib/libscanbuild" "$NDK_TOOLCHAIN/lib"
+  replace_toolchain_libs
   cp "$BUILD/make/build/bin/make" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm" "$NDK_TOOLCHAIN/bin"
@@ -1320,6 +1316,41 @@ assemble_unix() {
   patch_cmake_toolchain
 }
 
+# host detection lives in build/tools/ndk_bin_common.sh from r25, in
+# build/ndk-build itself before.
+ndk_host_sh() {
+  if [ -f "$NDK/build/tools/ndk_bin_common.sh" ]; then echo "$NDK/build/tools/ndk_bin_common.sh"
+  else echo "$NDK/build/ndk-build"; fi
+}
+
+# Swap the toolchain's lib/ for llvm-custom's, keeping the official Android
+# runtimes (lib/clang/<v>/lib/linux; lib64/clang/<v>/... before r25) and
+# lib/gcc (libgcc.a, crtbegin.o: r20-r22 link apps with -lgcc).
+replace_toolchain_libs() {
+  local rt="$BUILD/android-clang-rt" d
+  rm -rf "$rt"
+  d="$(ls -d "$NDK_TOOLCHAIN"/lib64/clang/*/lib/linux "$NDK_TOOLCHAIN"/lib/clang/*/lib/linux 2>/dev/null | head -n1)"
+  [ -n "$d" ] && cp -R "$d" "$rt"
+  find "$NDK_TOOLCHAIN/lib" -maxdepth 1 -mindepth 1 -not -name clang -not -name gcc -exec rm -rf {} \;
+  find "$NDK_TOOLCHAIN" -maxdepth 5 -path "*/lib/clang/[0-9][0-9]/lib/*" -not -name linux -exec rm -rf {} \;
+  # lib64: the official x86_64 host's libLLVM, libc++ and plugins, plus its runtimes (saved above)
+  rm -rf "$NDK_TOOLCHAIN/lib64"
+  for d in lib lib64; do
+    [ -d "$HOST_TOOLCHAIN/$d/clang" ] || continue
+    mkdir -p "$NDK_TOOLCHAIN/$d"; cp -R "$HOST_TOOLCHAIN/$d/clang" "$NDK_TOOLCHAIN/$d"
+  done
+  for d in libear libscanbuild; do
+    [ -d "$HOST_TOOLCHAIN/lib/$d" ] && cp -R "$HOST_TOOLCHAIN/lib/$d" "$NDK_TOOLCHAIN/lib"
+  done
+  # each llvm-custom resource dir gets the Android runtimes it does not have
+  if [ -d "$rt" ]; then
+    for d in "$NDK_TOOLCHAIN"/lib*/clang/*/; do
+      mkdir -p "$d/lib/linux"; cp -R --update=none "$rt/." "$d/lib/linux/"
+    done
+  fi
+  rm -rf "$rt"
+}
+
 # ndk_bin_common.sh HOST_ARCH normalization (bionic has a smaller arch list)
 fixup_host_arch() {
   if [ "$PLATFORM" = bionic ]; then
@@ -1334,7 +1365,7 @@ case $HOST_ARCH in\
   amd64) HOST_ARCH=x86_64;;\
   arm64|x86_64|riscv32|riscv64|ppc|ppcle|ppc64|ppc64le|mips|mips64|s390x) HOST_ARCH=$HOST_ARCH;;\
   *) echo "ERROR: Unknown host CPU architecture: $HOST_ARCH"; exit 1;;\
-esac' "$NDK/build/tools/ndk_bin_common.sh"
+esac' "$(ndk_host_sh)"
   else
     sed -i -E '/case \$HOST_ARCH in/,/esac/ c\
 case $HOST_ARCH in\
@@ -1347,7 +1378,7 @@ case $HOST_ARCH in\
   amd64) HOST_ARCH=x86_64;;\
   arm64|x86_64|riscv32|riscv64|ppc|ppcle|ppc64|ppc64le|mips|mips64|s390x) HOST_ARCH=$HOST_ARCH;;\
   *) echo "ERROR: Unknown host CPU architecture: $HOST_ARCH"; exit 1;;\
-esac' "$NDK/build/tools/ndk_bin_common.sh"
+esac' "$(ndk_host_sh)"
   fi
 }
 
@@ -1356,7 +1387,7 @@ fixup_bsd_host_os() {
   sed -i -e 's/FreeBsd/FreeBSD/' \
          -e '/case \$HOST_OS in/a \
 NetBSD) HOST_OS=netbsd;;\
-OpenBSD) HOST_OS=openbsd;;' "$NDK/build/tools/ndk_bin_common.sh"
+OpenBSD) HOST_OS=openbsd;;' "$(ndk_host_sh)"
   # build/core/init.mk only knows Linux/Darwin ("Unable to determine HOST_OS from
   # uname -s: FreeBSD"). Treat the BSDs like a Linux host: its HOST_TAG64
   # (linux-x86_64) is the compatibility symlink rename_host points at our dir.
@@ -1371,21 +1402,21 @@ OpenBSD) HOST_OS=openbsd;;' "$NDK/build/tools/ndk_bin_common.sh"
 # shipped one instead of failing.
 fixup_host_tag_fallback() {
   sed -i 's|^  \*) echo "ERROR: Unknown host CPU architecture: \$HOST_ARCH"; exit 1;;$|  *) ;;|' \
-    "$NDK/build/tools/ndk_bin_common.sh"
+    "$(ndk_host_sh)"
   sed -i '/^HOST_TAG=\$HOST_OS-\$HOST_ARCH$/a \
 if [ ! -d "$ANDROID_NDK_ROOT/prebuilt/$HOST_TAG" ]; then\
   for _d in "$ANDROID_NDK_ROOT"/prebuilt/*; do\
     [ -d "$_d" ] \&\& [ ! -L "$_d" ] \&\& HOST_TAG=${_d##*/}\
   done\
-fi' "$NDK/build/tools/ndk_bin_common.sh"
-  grep -q 'ANDROID_NDK_ROOT"/prebuilt/\*' "$NDK/build/tools/ndk_bin_common.sh" \
+fi' "$(ndk_host_sh)"
+  grep -q 'ANDROID_NDK_ROOT"/prebuilt/\*' "$(ndk_host_sh)" \
     || { echo "ndk_bin_common.sh: host tag fallback not patched" >&2; exit 1; }
 }
 
 # macos: stock ndk_bin_common.sh folds darwin-arm64 onto darwin-x86_64 (Google
 # ships universal binaries); we ship per-arch, so drop that remap.
 fixup_macos_host_os() {
-  sed -i '/if \[ \$HOST_TAG = darwin-arm64 \]; then/,/^fi$/d' "$NDK/build/tools/ndk_bin_common.sh"
+  sed -i '/if \[ \$HOST_TAG = darwin-arm64 \]; then/,/^fi$/d' "$(ndk_host_sh)"
 }
 
 # map a target triple's arch field to the NDK host-tag arch
@@ -1448,7 +1479,8 @@ rename_host() {
 
 # rewrite the ANDROID_HOST_TAG block in the cmake toolchain files
 patch_cmake_toolchain() {
-  local files=( "$NDK/build/cmake/android.toolchain.cmake" "$NDK/build/cmake/android-legacy.toolchain.cmake" )
+  local files=( "$NDK/build/cmake/android.toolchain.cmake" )
+  [ -f "$NDK/build/cmake/android-legacy.toolchain.cmake" ] && files+=( "$NDK/build/cmake/android-legacy.toolchain.cmake" )
   case "$PLATFORM" in
     bionic)
       sed -i -E '/^if\(CMAKE_HOST_SYSTEM_NAME STREQUAL Linux\)$/,/^endif\(\)$/c\
@@ -1640,19 +1672,15 @@ assemble_windows() {
   done
 
   sed -i -E '/case \$HOST_ARCH in/,/esac/ c\
-HOST_ARCH=x86_64' "$NDK/build/tools/ndk_bin_common.sh"
-  sed -i '/^HOST_ARCH=$(uname -m)$/d' "$NDK/build/tools/ndk_bin_common.sh"
+HOST_ARCH=x86_64' "$(ndk_host_sh)"
+  sed -i '/^HOST_ARCH=$(uname -m)$/d' "$(ndk_host_sh)"
 
   # remove unused resources
   rm -rf "$NDK_TOOLCHAIN/python3"
   rm -rf "$NDK/simpleperf"                 # can't build simpleperf as it requires AOSP sources
-  find "$NDK_TOOLCHAIN/lib" -maxdepth 1 -mindepth 1 -not -name clang -exec rm -rf {} \;
-  find "$NDK_TOOLCHAIN" -maxdepth 5 -path "*/lib/clang/[0-9][0-9]/lib/*" -not -name linux -exec rm -rf {} \;
 
   # copy compiled binaries
-  cp -R "$HOST_TOOLCHAIN/lib/clang" "$NDK_TOOLCHAIN/lib"
-  cp -R "$HOST_TOOLCHAIN/lib/libear" "$NDK_TOOLCHAIN/lib"
-  cp -R "$HOST_TOOLCHAIN/lib/libscanbuild" "$NDK_TOOLCHAIN/lib"
+  replace_toolchain_libs
   cp "$BUILD/make/build/bin/make.exe" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm.exe" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm.exe" "$NDK_TOOLCHAIN/bin"
