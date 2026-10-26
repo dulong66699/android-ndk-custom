@@ -602,7 +602,7 @@ build_shaderc() {
   # C files. Tests are off, so gtest/effcee/re2 never see them.
   cmake -S "$SH" -B "$SH/build" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$SH/install" \
-    -DCMAKE_BUILD_TYPE=MinSizeRel \
+    -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_FLAGS="$cflags" -DCMAKE_CXX_FLAGS="$cflags -fno-rtti -fno-exceptions" \
     -DCMAKE_EXE_LINKER_FLAGS="$exelink" -DCMAKE_SHARED_LINKER_FLAGS="$shlink" \
     -DCMAKE_CROSSCOMPILING=True -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
@@ -1161,8 +1161,8 @@ build_python2() {
                        CFLAGS="-O2 -fwrapv -D__USE_MINGW_ANSI_STDIO=1 -Wno-incompatible-function-pointer-types -Wno-incompatible-pointer-types -Wno-int-conversion -Wno-error=implicit-function-declaration"
                        LDFLAGS="-L$PYDEPS/lib -static-libgcc$laa"
                        WINDRES="$TC/bin/${TARGET}-windres" ) ;;
-      linux)   args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion $CROSS_CFLAGS"
-                       LDFLAGS="-L$PYDEPS/lib $CROSS_LDFLAGS" ) ;;
+      linux)   args+=( CFLAGS="-fwrapv -Wno-error=date-time -Wno-incompatible-function-pointer-types -Wno-int-conversion -g0 $CROSS_CFLAGS"
+                       LDFLAGS="-L$PYDEPS/lib -s $CROSS_LDFLAGS" ) ;;
       bsd)     # as for python3: PIC throughout, and export the interpreter's
                # symbols to the shared stdlib modules.
                local obsd=""; [ "$SYSTEM_NAME" = OpenBSD ] && obsd="-D_BSD_SOURCE"
