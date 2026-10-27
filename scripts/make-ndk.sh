@@ -1269,7 +1269,7 @@ assemble_unix() {
     elif ! file "$file" | grep -Eq 'Python script|Perl script|ASCII text'; then
       echo "Removing $bname"; rm "$file"
     fi
-  done
+  done || true
 
   sed -i 's,#!/usr/bin/env bash,#!/usr/bin/env sh,' $(ls -d "$NDK/build/tools/ndk_bin_common.sh" "$NDK/build/tools/make_standalone_toolchain.py" "$NDK/build/ndk-build" 2>/dev/null)
   sed -i 's,#!/bin/bash,#!/bin/sh,' "$PREBUILT_BIN/ndk-stack" "$PREBUILT_BIN/ndk-which"
