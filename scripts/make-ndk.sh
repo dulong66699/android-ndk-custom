@@ -1255,6 +1255,7 @@ assemble_ndk() {
 }
 
 assemble_unix() {
+  set -xv
   local PREBUILT_BIN="$NDK/prebuilt/linux-x86_64/bin"
 
   strip_debugger
@@ -1269,7 +1270,7 @@ assemble_unix() {
     elif ! file "$file" | grep -Eq 'Python script|Perl script|ASCII text'; then
       echo "Removing $bname"; rm "$file"
     fi
-  done || true
+  done
 
   sed -i 's,#!/usr/bin/env bash,#!/usr/bin/env sh,' $(ls -d "$NDK/build/tools/ndk_bin_common.sh" "$NDK/build/tools/make_standalone_toolchain.py" "$NDK/build/ndk-build" 2>/dev/null)
   sed -i 's,#!/bin/bash,#!/bin/sh,' "$PREBUILT_BIN/ndk-stack" "$PREBUILT_BIN/ndk-which"
