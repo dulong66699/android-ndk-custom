@@ -20,12 +20,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 #   3.12, so pull 3.11 from deadsnakes).
 # p7zip-full: 7z for the windows NDK archive.
 # autoconf-archive + pkg-config: needed by the windows autoreconf.
+# bison + flex: AOSP's binutils tree ships no generated parsers.
 RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates aria2 xz-utils unzip git make cmake ninja-build \
         build-essential file p7zip-full python3 python3.11 \
-        autoconf automake libtool autoconf-archive pkg-config \
+        autoconf automake libtool autoconf-archive pkg-config bison flex \
         clang lld zlib1g-dev libssl-dev libxml2-dev liblzma-dev libbz2-dev uuid-dev cpio bzip2 \
     && rm -rf /var/lib/apt/lists/*
 

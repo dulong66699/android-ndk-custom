@@ -510,6 +510,81 @@ build_yasm() {
   )
 }
 
+# --- GNU binutils (r20-r23) -----------------------------------------------
+# Only where the official NDK still ships them: the full set through r22, just
+# `as` in r23. Built from AOSP's toolchain/binutils at the revision the NDK's
+# manifest pins, with do_build.py's configure flags (no plugins: the only one
+# was the official x86_64 LLVMgold.so). Installs to $BUILD/binutils/out.
+build_binutils() {
+  local tc="$LINUX_NDK/toolchains/llvm/prebuilt/linux-x86_64" rev full=yes arch t
+  [ -e "$tc/bin/aarch64-linux-android-as" ] || return 0
+  [ -e "$tc/bin/aarch64-linux-android-ld.bfd" ] || full=no
+  rev="$(sed -n 's|.*name="toolchain/binutils".*revision="\([0-9a-f]\{40\}\)".*|\1|p' "$tc"/manifest_*.xml 2>/dev/null | head -n1)"
+  [ -n "$rev" ] || { echo "binutils: no toolchain/binutils revision in the NDK manifest" >&2; exit 1; }
+  log "Building binutils ($rev, $([ $full = yes ] && echo full || echo as only))"
+  local src="$BUILD/binutils/src" out="$BUILD/binutils/out"
+  rm -rf "$BUILD/binutils"; mkdir -p "$out"
+  git_fetch https://android.googlesource.com/toolchain/binutils "$rev" "$src" binutils-2.27
+  cp "$ROOT/config/config.sub" "$ROOT/config/config.guess" "$src/"
+  local p
+  for p in "$ROOT"/patches/binutils/*.patch; do
+    patch -d "$src" -Np1 -s -i "$p" || { echo "binutils: $(basename "$p") did not apply" >&2; exit 1; }
+  done
+  # one timestamp for the whole tree, or make sees its generated parsers and
+  # docs as stale and wants bison and makeinfo
+  find "$src" -exec touch -h -d '2016-08-03 00:00:00' {} +
+  # 2016 sources under current clang: keep its old-C leniencies as warnings.
+  local w="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=incompatible-function-pointer-types"
+  local cflags="-O2 -fwrapv $w" cxxflags="-O2 -std=gnu++11 -Wno-register" ldflags=""
+  case "$PLATFORM" in
+    # bionic: glob() only from API 28; ld uses it just for ld.so.conf
+    # bionic: pthreads live in libc, but gold links -lpthread; give it an empty one.
+    # --static: libtool swallows -static instead of passing it to the compiler.
+    bionic)  mkdir -p "$BUILD/binutils/stub"; "$CROSS_AR" rcs "$BUILD/binutils/stub/libpthread.a"
+             ldflags="--static -L$BUILD/binutils/stub $BIONIC_EXE_LDFLAGS"; [ "$API" -lt 28 ] && export ac_cv_func_glob=no ;;
+    windows) ldflags="--static" ;;
+    *)       cflags="$cflags $CROSS_CFLAGS"; cxxflags="$cxxflags $CROSS_CFLAGS"; ldflags="$CROSS_LDFLAGS" ;;
+  esac
+  for arch in aarch64 arm i686 x86_64; do
+    t="$arch-linux-android"; [ "$arch" = arm ] && t=arm-linux-androideabi
+    ( mkdir -p "$BUILD/binutils/$t" && cd "$BUILD/binutils/$t"
+      local gold=--enable-gold=default
+      [ "$arch" = aarch64 ] && gold="--enable-fix-cortex-a53-835769 --enable-gold"
+      "$src/configure" --build=x86_64-linux-gnu --host="$TARGET" --target="$t" \
+        --prefix=/toolchain --with-sysroot=/toolchain/sysroot --program-prefix="$t-" \
+        --enable-initfini-array --enable-threads --disable-plugins --disable-nls \
+        --disable-werror --disable-gdb --disable-sim $gold \
+        CC="$CROSS_CC" CXX="$CROSS_CXX" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" STRIP="$CROSS_STRIP" \
+        CFLAGS="$cflags" CXXFLAGS="$cxxflags" LDFLAGS="$ldflags" > configure.log 2>&1 \
+        || { tail -n 40 configure.log >&2; exit 1; }
+      if [ "$full" = yes ]; then
+        make -j"$(ncpu)" MAKEINFO=true > make.log 2>&1 || { grep -E -B2 -A4 ' error|Error [0-9]' make.log | tail -n 80 >&2; exit 1; }
+        make install MAKEINFO=true DESTDIR="$out" > install.log 2>&1 || { tail -n 30 install.log >&2; exit 1; }
+      else
+        make -j"$(ncpu)" MAKEINFO=true all-gas > make.log 2>&1 || { grep -E -B2 -A4 ' error|Error [0-9]' make.log | tail -n 80 >&2; exit 1; }
+        make install-gas MAKEINFO=true DESTDIR="$out" > install.log 2>&1 || { tail -n 30 install.log >&2; exit 1; }
+      fi )
+  done
+  local f
+  find "$out/toolchain/bin" "$out"/toolchain/*-linux-android*/bin -type f | while IFS= read -r f; do
+    if [ "$PLATFORM" = bionic ]; then "$CROSS_STRIP" -s "$f"; else "$CROSS_STRIP" "$f"; fi
+  done
+}
+
+# Swap the official binutils for ours: bin/<triple>-* (handled in the assemble
+# loops) and <triple>/bin/*. Only the names the official NDK ships; anything we
+# did not build goes, since the official ones only run on x86_64.
+replace_triple_binutils() {
+  local out="$BUILD/binutils/out/toolchain" d f
+  for d in "$NDK_TOOLCHAIN"/*-linux-android*/bin; do
+    [ -d "$d" ] || continue
+    find "$d" -maxdepth 1 -type f | while IFS= read -r f; do
+      local rel="${f#"$NDK_TOOLCHAIN"/}"
+      if [ -f "$out/$rel" ]; then cp "$out/$rel" "$f"; else echo "Removing $rel"; rm -f "$f"; fi
+    done
+  done
+}
+
 # --- SPIRV-Tools + shaderc --------------------------------------------------
 build_shaderc() {
   log "Building shaderc"
@@ -1262,7 +1337,9 @@ assemble_unix() {
   # replace ELF tools with the rebuilt ones; convert bash shebangs; drop the rest
   find "$NDK_TOOLCHAIN/bin" -type f | while IFS= read -r file; do
     bname="$(basename "$file")"
-    if [ -f "$HOST_TOOLCHAIN/bin/$bname" ] && file "$file" | grep -q 'ELF'; then
+    if [ -f "$BUILD/binutils/out/toolchain/bin/$bname" ]; then
+      echo "Replacing $bname (binutils)"; cp "$BUILD/binutils/out/toolchain/bin/$bname" "$file"
+    elif [ -f "$HOST_TOOLCHAIN/bin/$bname" ] && file "$file" | grep -q 'ELF'; then
       echo "Replacing $bname"; cp "$HOST_TOOLCHAIN/bin/$bname" "$file"
     elif file "$file" | grep -q 'Bourne-Again shell script'; then
       # r26 and older write #!/bin/bash, which Android and the BSDs lack
@@ -1297,6 +1374,7 @@ assemble_unix() {
 
   # copy compiled binaries
   replace_toolchain_libs
+  replace_triple_binutils
   cp "$BUILD/make/build/bin/make" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm" "$NDK_TOOLCHAIN/bin"
@@ -1665,7 +1743,9 @@ assemble_windows() {
 
   find "$NDK_TOOLCHAIN/bin" -type f | while IFS= read -r file; do
     bname="$(basename "$file")"
-    if [ -f "$HOST_TOOLCHAIN/bin/$bname" ] && file "$file" | grep -q 'PE32'; then
+    if [ -f "$BUILD/binutils/out/toolchain/bin/$bname" ]; then
+      echo "Replacing $bname (binutils)"; cp "$BUILD/binutils/out/toolchain/bin/$bname" "$file"
+    elif [ -f "$HOST_TOOLCHAIN/bin/$bname" ] && file "$file" | grep -q 'PE32'; then
       echo "Replacing $bname"; cp "$HOST_TOOLCHAIN/bin/$bname" "$file"
     elif ! file "$file" | grep -Eq 'Python script|Perl script|ASCII text'; then
       echo "Removing $bname"; rm "$file"
@@ -1682,6 +1762,7 @@ HOST_ARCH=x86_64' "$(ndk_host_sh)"
 
   # copy compiled binaries
   replace_toolchain_libs
+  replace_triple_binutils
   cp "$BUILD/make/build/bin/make.exe" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm.exe" "$PREBUILT_BIN"
   cp "$BUILD/yasm/build/bin/yasm.exe" "$NDK_TOOLCHAIN/bin"
@@ -1729,6 +1810,7 @@ patch_sysroot_arc4random
 setup_toolchain
 build_make
 build_yasm
+build_binutils
 build_shaderc
 build_pydeps
 build_python

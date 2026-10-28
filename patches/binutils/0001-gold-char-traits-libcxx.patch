@@ -1,0 +1,58 @@
+--- a/gold/gold.h
++++ b/gold/gold.h
+@@ -40,6 +40,55 @@
+ 
+ #include "system.h"
+ 
++// gold builds std::basic_string over uint16_t and uint32_t (Stringpool for
++// 2- and 4-byte merge sections); libc++ 19 dropped the char_traits base
++// template those relied on.
++#if defined(__cplusplus) && defined(_LIBCPP_VERSION)
++#include <cwchar>
++#include <ios>
++namespace std
++{
++template<typename C, typename I>
++struct gold_char_traits
++{
++  typedef C char_type;
++  typedef I int_type;
++  typedef streamoff off_type;
++  typedef streampos pos_type;
++  typedef mbstate_t state_type;
++  static void assign(char_type& a, const char_type& b) { a = b; }
++  static bool eq(char_type a, char_type b) { return a == b; }
++  static bool lt(char_type a, char_type b) { return a < b; }
++  static int compare(const char_type* a, const char_type* b, size_t n)
++  {
++    for (; n; --n, ++a, ++b)
++      if (*a != *b)
++        return *a < *b ? -1 : 1;
++    return 0;
++  }
++  static size_t length(const char_type* s)
++  { size_t n = 0; while (s[n]) ++n; return n; }
++  static const char_type* find(const char_type* s, size_t n, const char_type& c)
++  { for (; n; --n, ++s) if (*s == c) return s; return 0; }
++  static char_type* move(char_type* d, const char_type* s, size_t n)
++  { return n ? static_cast<char_type*>(memmove(d, s, n * sizeof(char_type))) : d; }
++  static char_type* copy(char_type* d, const char_type* s, size_t n)
++  { return n ? static_cast<char_type*>(memcpy(d, s, n * sizeof(char_type))) : d; }
++  static char_type* assign(char_type* d, size_t n, char_type c)
++  { for (size_t i = 0; i < n; ++i) d[i] = c; return d; }
++  static char_type to_char_type(int_type c) { return char_type(c); }
++  static int_type to_int_type(char_type c) { return int_type(c); }
++  static bool eq_int_type(int_type a, int_type b) { return a == b; }
++  static int_type eof() { return int_type(-1); }
++  static int_type not_eof(int_type c) { return eq_int_type(c, eof()) ? 0 : c; }
++};
++template<> struct char_traits<unsigned short>
++  : gold_char_traits<unsigned short, unsigned int> { };
++template<> struct char_traits<unsigned int>
++  : gold_char_traits<unsigned int, unsigned long long> { };
++} // namespace std
++#endif
++
+ namespace gold
+ {
+ 
