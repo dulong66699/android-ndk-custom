@@ -182,7 +182,7 @@ strip_debugger() {
   rm -f "$NDK_TOOLCHAIN/bin"/*lldb*
   rm -rf "$NDK/python-packages"
   find "$NDK_TOOLCHAIN/lib" -name 'lldb-server' -delete 2>/dev/null || true
-  rm -f "$PREBUILT_BIN"/gdb "$PREBUILT_BIN"/gdb.exe "$PREBUILT_BIN"/gdb-orig "$PREBUILT_BIN"/gdb-orig.exe
+  rm -f "$PREBUILT_BIN"/gdb "$PREBUILT_BIN"/gdb.exe "$PREBUILT_BIN"/gdb-orig "$PREBUILT_BIN"/gdb-orig.exe "$PREBUILT_BIN"/gcore
   rm -rf "$PREBUILT_BIN/../share/gdb" "$NDK"/prebuilt/android-*
   rm -rf "$NDK/toolchains/renderscript"
 }
@@ -1265,13 +1265,14 @@ assemble_unix() {
     if [ -f "$HOST_TOOLCHAIN/bin/$bname" ] && file "$file" | grep -q 'ELF'; then
       echo "Replacing $bname"; cp "$HOST_TOOLCHAIN/bin/$bname" "$file"
     elif file "$file" | grep -q 'Bourne-Again shell script'; then
-      echo "Replacing SheBang $bname"; sed -i 's,#!/usr/bin/env bash,#!/usr/bin/env sh,' "$file"
+      # r26 and older write #!/bin/bash, which Android and the BSDs lack
+      echo "Replacing SheBang $bname"; sed -i -E '1s,^#! ?(/usr/bin/env bash|/bin/bash)( |$),#!/usr/bin/env sh\2,' "$file"
     elif ! file "$file" | grep -Eq 'Python script|Perl script|ASCII text'; then
       echo "Removing $bname"; rm "$file"
     fi
   done
 
-  sed -i 's,#!/usr/bin/env bash,#!/usr/bin/env sh,' $(ls -d "$NDK/build/tools/ndk_bin_common.sh" "$NDK/build/tools/make_standalone_toolchain.py" "$NDK/build/ndk-build" 2>/dev/null)
+  sed -i -E '1s,^#! ?(/usr/bin/env bash|/bin/bash)( |$),#!/usr/bin/env sh\2,' $(ls -d "$NDK/build/tools/ndk_bin_common.sh" "$NDK/build/tools/make_standalone_toolchain.py" "$NDK/build/ndk-build" 2>/dev/null)
   sed -i 's,#!/bin/bash,#!/bin/sh,' "$PREBUILT_BIN/ndk-stack" "$PREBUILT_BIN/ndk-which"
   cp "$ROOT/patches/ndk/scripts/clang-tidy.sh" "$NDK_TOOLCHAIN/bin"
   cp "$ROOT/patches/ndk/scripts/ndk-which" "$PREBUILT_BIN"
