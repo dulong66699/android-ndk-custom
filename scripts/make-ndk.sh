@@ -1408,7 +1408,7 @@ ndk_host_sh() {
 replace_toolchain_libs() {
   local rt="$BUILD/android-clang-rt" d
   rm -rf "$rt"
-  d="$(ls -d "$NDK_TOOLCHAIN"/lib64/clang/*/lib/linux "$NDK_TOOLCHAIN"/lib/clang/*/lib/linux 2>/dev/null | head -n1)"
+  d="$(ls -d "$NDK_TOOLCHAIN"/lib64/clang/*/lib/linux "$NDK_TOOLCHAIN"/lib/clang/*/lib/linux 2>/dev/null | head -n1 || true)"
   [ -n "$d" ] && cp -R "$d" "$rt"
   find "$NDK_TOOLCHAIN/lib" -maxdepth 1 -mindepth 1 -not -name clang -not -name gcc -exec rm -rf {} \;
   find "$NDK_TOOLCHAIN" -maxdepth 5 -path "*/lib/clang/[0-9][0-9]/lib/*" -not -name linux -exec rm -rf {} \;
